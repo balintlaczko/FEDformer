@@ -131,4 +131,13 @@ def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
 
 
 def time_features(dates, freq='h'):
+    # the time_features_from_frequency_str returns a list of appropriate date "encoders" for the given frequency
+    # for each of these encoders we encode all the dates (all dates as seconds, all dates as minutes, all dates as hours, etc.)
+    # and then we vstack these, so the final shape is (len(encoders), len(dates))
+    """
+    Returns an array of dates encoded as time features.
+
+    Returns:
+        np.ndarray: An array of (features, dates) where features is the number of time features and dates is the number of dates.
+    """
     return np.vstack([feat(dates) for feat in time_features_from_frequency_str(freq)])
