@@ -139,8 +139,8 @@ class Model(nn.Module):
         mean = torch.mean(x_enc, dim=1).unsqueeze(
             1).repeat(1, self.pred_len, 1)  # [B, T, C], t = pred_len
         # this seems unused
-        zeros = torch.zeros([x_dec.shape[0], self.pred_len,
-                            x_dec.shape[2]]).to(device)  # cuda()
+        # zeros = torch.zeros([x_dec.shape[0], self.pred_len,
+        #                     x_dec.shape[2]]).to(device)  # cuda()
         seasonal_init, trend_init = self.decomp(
             x_enc)  # [B, T, C], [B, T, C], t = seq_len
         # decoder input
