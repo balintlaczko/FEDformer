@@ -439,3 +439,43 @@ class Dataset_Pred(Dataset):
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
+
+
+class Dataset_RAVEnc(Dataset):
+    def __init__(
+        self,
+        root_path="/Volumes/T7RITMO/RAVE_encoded_datasets",
+        flag='train',
+        size=None,  # [seq_len, label_len, pred_len]
+        data_path="vctk_rave_encoded.h5",
+        rave_model_id="vctk",
+        scale=True,
+        timeenc=0,
+    ) -> None:
+        super().__init__()
+
+        # parse size, if provided [seq_len, label_len, pred_len]
+        if size == None:
+            # TODO: what should these values be for us?
+            self.seq_len = 32
+            self.label_len = 8
+            self.pred_len = 8
+        else:
+            self.seq_len = size[0]
+            self.label_len = size[1]
+            self.pred_len = size[2]
+
+        # ...
+        self.__read_data__()
+
+    def __read_data__(self):
+        pass
+
+    def __getitem__(self, index):
+        pass
+
+    def __len__(self):
+        pass
+
+    def inverse_transform(self, data):
+        pass
