@@ -508,7 +508,7 @@ class Dataset_RAVEnc(Dataset):
         if self.scale:
             self.fit_scaler()
 
-    def __getitem__(self, index) -> tuple(torch.Tensor, torch.Tensor):
+    def __getitem__(self, index):
         """
         Get a sample from the dataset, where a sample is a tuple of:
         (seq_x, seq_y). seq_x is the input sequence (start_frame --> start_frame + seq_len),
@@ -518,7 +518,7 @@ class Dataset_RAVEnc(Dataset):
             index: The index in the chunked dataset. We use it to look up the embedding id and start frame.
 
         Returns:
-            tuple(torch.Tensor, torch.Tensor): The input and output sequences.
+            tuple(torch.Tensor): The input and output sequences.
         """
         dataset_index, start_frame = self.chunk_dataset[index]
         if not self.all_in_memory:
@@ -623,7 +623,8 @@ class Dataset_RAVEnc(Dataset):
         # for each dataset in the csv file
         for i, row in self.df.iterrows():
             # get the dataset index
-            dataset_index = row["dataset_index"].values[0]
+            # dataset_index = row["dataset_index"].values[0]
+            dataset_index = row["dataset_index"]
             # retrieve the whole embedding as a tensor
             embedding = self.whole_file_embeddings[dataset_index]
             # generate the start frames for the chunks
@@ -634,7 +635,7 @@ class Dataset_RAVEnc(Dataset):
                     list((dataset_index, chunk_index)))
         self.chunk_dataset = np.array(self.chunk_dataset)
 
-    def chunk_indices(self, tensor_length: int) -> list(int):
+    def chunk_indices(self, tensor_length: int):
         """
         Given the length of a tensor, return a list of inidices as
         start frames for chunks of length seq_len + pred_len
@@ -685,7 +686,7 @@ class Dataset_RAVEnc(Dataset):
         # extract the chunk
         return tensor[..., start_frame:start_frame+self.seq_len+self.pred_len]
 
-    def get_x_y(self, chunk: torch.Tensor) -> tuple(torch.Tensor, torch.Tensor):
+    def get_x_y(self, chunk: torch.Tensor):
         """
         Given a chunk of length seq_len + pred_len, return the input and output sequences.
 
@@ -693,7 +694,7 @@ class Dataset_RAVEnc(Dataset):
             chunk (torch.Tensor): The chunk of length seq_len + pred_len.
 
         Returns:
-            tuple(torch.Tensor, torch.Tensor): The input and output sequences.
+            tuple: The input and output sequences.
         """
         seq_x = chunk[..., :self.seq_len]
         seq_y = chunk[..., self.seq_len -

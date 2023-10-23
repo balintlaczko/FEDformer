@@ -25,8 +25,8 @@ def data_provider(args, flag):
             csv_path=args.csv_path,
             flag=flag,
             size=[args.seq_len, args.label_len, args.pred_len],
-            scale=args.scale,
-            all_in_memory=args.all_in_memory
+            scale=True,
+            all_in_memory=True
         )
         print(flag, len(data_set))
         data_loader = DataLoader(
