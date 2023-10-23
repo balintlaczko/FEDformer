@@ -1,16 +1,16 @@
+import numpy as np
+import math
+from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp, series_decomp_multi
+from layers.SelfAttention_Family import FullAttention, ProbAttention
+from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
+from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
+from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
+from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import sys
 sys.path.append("..")
-from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding
-from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
-from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
-from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
-from layers.SelfAttention_Family import FullAttention, ProbAttention
-from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp, series_decomp_multi
-import math
-import numpy as np
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -146,6 +146,8 @@ class Model(nn.Module):
         """
         # decomp init
         # take the means per feature, and repeat it for the prediction length
+        # print(f'x_enc.shape: {x_enc.shape}')
+        # print(f'self.pred_len: {self.pred_len}')
         mean = torch.mean(x_enc, dim=1).unsqueeze(
             1).repeat(1, self.pred_len, 1)  # [B, T, C], t = pred_len
         # this seems unused
