@@ -27,8 +27,9 @@ class moving_avg(nn.Module):
 
     def __init__(self, kernel_size, stride):
         super(moving_avg, self).__init__()
-        self.kernel_size = kernel_size
-        self.avg = nn.AvgPool1d(kernel_size=kernel_size,
+        # print(kernel_size, type(kernel_size))
+        self.kernel_size = int(kernel_size)
+        self.avg = nn.AvgPool1d(kernel_size=int(kernel_size),
                                 stride=stride, padding=0)
 
     def forward(self, x):
@@ -38,7 +39,9 @@ class moving_avg(nn.Module):
         end = x[:, -1:, :].repeat(1,
                                   math.floor((self.kernel_size - 1) // 2), 1)
         x = torch.cat([front, x, end], dim=1)
-        x = self.avg(x.permute(0, 2, 1))
+        x = x.permute(0, 2, 1)
+        # print(f'x.shape: {x.shape}')
+        x = self.avg(x)
         x = x.permute(0, 2, 1)
         return x
 
