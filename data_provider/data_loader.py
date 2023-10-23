@@ -533,7 +533,10 @@ class Dataset_RAVEnc(Dataset):
             chunk = torch.from_numpy(chunk).unsqueeze(0)
         # extract the input and output sequences
         seq_x, seq_y = self.get_x_y(chunk)
-        return seq_x, seq_y
+        # rave embeddings are BCT, so we need to transpose them to BTC
+        seq_x = seq_x.transpose(1, 2)
+        seq_y = seq_y.transpose(1, 2)
+        return seq_x, seq_y  # as BTC
 
     def __len__(self):
         # return the number of chunks
