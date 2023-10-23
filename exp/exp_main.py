@@ -10,6 +10,7 @@ from exp.exp_basic import Exp_Basic
 from models import FEDformer, Autoformer, Informer, Transformer
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
+import tqdm
 
 
 warnings.filterwarnings('ignore')
@@ -118,16 +119,25 @@ class Exp_Main(Exp_Basic):
 
             self.model.train()
             epoch_time = time.time()
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
+            # for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
+            for i, data in enumerate(tqdm.tqdm(train_loader)):
+                if self.args.embed == 'token_only':
+                    batch_x, batch_y = data
+                    batch_x_mark = None
+                    batch_y_mark = None
+                else:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark = data
                 iter_count += 1
                 model_optim.zero_grad()
                 # batch_x is the input sequence (begin --> begin + seq_len)
                 batch_x = batch_x.float().to(self.device)
                 # batch_y is the output sequence (begin + seq_len - label_len --> begin + seq_len + pred_len)
                 batch_y = batch_y.float().to(self.device)
-                # x_mark and y_mark are the encoded date and time of the input and output sequences
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
+
+                if self.args.embed != 'token_only':
+                    # x_mark and y_mark are the encoded date and time of the input and output sequences
+                    batch_x_mark = batch_x_mark.float().to(self.device)
+                    batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
                 # create a tensor taking the labels and extending it with zeros for the predictions
