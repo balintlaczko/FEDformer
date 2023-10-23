@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import sys
+sys.path.append("..")
 from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding
 from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
 from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
@@ -188,18 +190,23 @@ if __name__ == '__main__':
         mode_select = 'random'
         # version = 'Fourier'
         version = 'Wavelets'
-        moving_avg = [12, 24]
+        # moving_avg = [12, 24]
+        moving_avg = [6, 12]
         L = 1
         base = 'legendre'
         cross_activation = 'tanh'
-        seq_len = 96
-        label_len = 48
-        pred_len = 96
+        # seq_len = 96
+        seq_len = 32
+        # label_len = 48
+        label_len = 16
+        # pred_len = 96
+        pred_len = 8
         output_attention = True
         enc_in = 7
         dec_in = 7
         d_model = 16
-        embed = 'timeF'
+        # embed = 'timeF'
+        embed = 'token_only'
         dropout = 0.05
         freq = 'h'
         factor = 1
