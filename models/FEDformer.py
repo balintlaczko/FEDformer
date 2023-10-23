@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from layers.Embed import DataEmbedding, DataEmbedding_wo_pos
+from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding
 from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
 from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
 from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
@@ -28,6 +28,7 @@ class Model(nn.Module):
         self.label_len = configs.label_len
         self.pred_len = configs.pred_len
         self.output_attention = configs.output_attention
+        self.embed = configs.embed
 
         # Decomp
         kernel_size = configs.moving_avg
@@ -40,10 +41,17 @@ class Model(nn.Module):
         # The series-wise connection inherently contains the sequential information.
         # Thus, we can discard the position embedding of transformers.
         # d_model = 512
-        self.enc_embedding = DataEmbedding_wo_pos(configs.enc_in, configs.d_model, configs.embed, configs.freq,
-                                                  configs.dropout)
-        self.dec_embedding = DataEmbedding_wo_pos(configs.dec_in, configs.d_model, configs.embed, configs.freq,
-                                                  configs.dropout)
+        # we use "token_only" for RAVE embeddings datasets
+        if self.embed.lower() == 'token_only':
+            self.enc_embedding = TokenEmbedding(
+                configs.enc_in, configs.d_model)
+            self.dec_embedding = TokenEmbedding(
+                configs.dec_in, configs.d_model)
+        else:
+            self.enc_embedding = DataEmbedding_wo_pos(configs.enc_in, configs.d_model, configs.embed, configs.freq,
+                                                      configs.dropout)
+            self.dec_embedding = DataEmbedding_wo_pos(configs.dec_in, configs.d_model, configs.embed, configs.freq,
+                                                      configs.dropout)
 
         if configs.version == 'Wavelets':
             encoder_self_att = MultiWaveletTransform(
@@ -120,16 +128,16 @@ class Model(nn.Module):
             projection=nn.Linear(configs.d_model, configs.c_out, bias=True)
         )
 
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec,
+    def forward(self, x_enc, x_mark_enc=None, x_dec=None, x_mark_dec=None,
                 enc_self_mask=None, dec_self_mask=None, dec_enc_mask=None):
         """
         The main forward call of FEDformer
 
         Args:
             x_enc (torch.Tensor): The input sequence for the encoder. Shape: [B, T, C] where T = seq_len, C is the number of features
-            x_mark_enc (torch.Tensor): The encoded time features for the encoder. Shape: [B, T, C] where T = seq_len, C is the number of encoded time features (seconds, minutes, hours, etc.)
-            x_dec (torch.Tensor): The label sequence (extended with zeros for predictions) for the decoder. Shape: [B, T, C], where T = label_len + pred_len
-            x_mark_dec (torch.Tensor): The encoded time features for the labels and the predictions for the decoder. Shape: [B, T, C], where T = label_len + pred_len
+            x_mark_enc (torch.Tensor, optional): The encoded time features for the encoder. Shape: [B, T, C] where T = seq_len, C is the number of encoded time features (seconds, minutes, hours, etc.)
+            x_dec (torch.Tensor, optional): The label sequence (extended with zeros for predictions) for the decoder. Shape: [B, T, C], where T = label_len + pred_len
+            x_mark_dec (torch.Tensor, optional): The encoded time features for the labels and the predictions for the decoder. Shape: [B, T, C], where T = label_len + pred_len
 
         Returns:
             torch.Tensor: The predictions for the decoder. Shape: [B, pred_len, C] (I hope)
@@ -151,10 +159,16 @@ class Model(nn.Module):
         seasonal_init = F.pad(
             seasonal_init[:, -self.label_len:, :], (0, 0, 0, self.pred_len))  # [B, T, C], t = label_len + pred_len
         # enc
-        enc_out = self.enc_embedding(x_enc, x_mark_enc)  # [B, T, 512]
+        if self.embed.lower() == 'token_only':
+            enc_out = self.enc_embedding(x_enc)
+        else:
+            enc_out = self.enc_embedding(x_enc, x_mark_enc)  # [B, T, 512]
         enc_out, attns = self.encoder(enc_out, attn_mask=enc_self_mask)
         # dec
-        dec_out = self.dec_embedding(seasonal_init, x_mark_dec)
+        if self.embed.lower() == 'token_only':
+            dec_out = self.dec_embedding(x_dec)
+        else:
+            dec_out = self.dec_embedding(seasonal_init, x_mark_dec)
         seasonal_part, trend_part = self.decoder(dec_out, enc_out, x_mask=dec_self_mask, cross_mask=dec_enc_mask,
                                                  trend=trend_init)
         # final
