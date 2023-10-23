@@ -562,7 +562,12 @@ class Dataset_RAVEnc(Dataset):
 
     def inverse_transform(self, data):
         # inverse transform the data with a scaler fit to the chunks ds
-        pass
+        if self.scaler == None:
+            self.fit_scaler()
+        # scale without the batch dimension
+        it = self.scaler.inverse_transform(data.squeeze(0).numpy())
+        # return with the batch dimension
+        return torch.from_numpy(it).unsqueeze(0)
 
     def load_all_in_memory(self) -> None:
         """
