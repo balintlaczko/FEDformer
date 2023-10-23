@@ -460,7 +460,7 @@ class Dataset_RAVEnc(Dataset):
         if size == None:
             # TODO: what should the default values be for us?
             self.seq_len = 32
-            self.label_len = 8
+            self.label_len = 16
             self.pred_len = 8
         else:
             self.seq_len = size[0]
