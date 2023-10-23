@@ -536,7 +536,10 @@ class Dataset_RAVEnc(Dataset):
         # rave embeddings are BCT, so we need to transpose them to BTC
         seq_x = seq_x.transpose(1, 2)
         seq_y = seq_y.transpose(1, 2)
-        return seq_x, seq_y  # as BTC
+        # print("seq_x shape: ", seq_x.shape)
+        # print("seq_y shape: ", seq_y.shape)
+        # return seq_x, seq_y  # as BTC
+        return seq_x.squeeze(0), seq_y.squeeze(0)  # as TC
 
     def __len__(self):
         # return the number of chunks
@@ -547,21 +550,35 @@ class Dataset_RAVEnc(Dataset):
         Fit a standard scaler to the dataset.
         """
         self.scaler = StandardScaler()
+        # get progress bar from chunks dataset
+        pbar = tqdm.tqdm(self.chunk_dataset)
+        pbar.set_description("fitting standard scaler")
         if not self.all_in_memory:
             with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as f:
-                # get progress bar form indices
-                pbar = tqdm.tqdm(f.keys())
-                pbar.set_description("fitting standard scaler:")
-                tensors = [torch.from_numpy(f[str(int(i))][()]) for i in pbar]
-                # stack them together
-                tensors = torch.cat(tensors, dim=-1)
-                # fit the scaler
-                self.scaler.fit(tensors.squeeze(0).numpy())
+                # for each chunk in the dataset
+                for i in pbar:
+                    dataset_index, start_frame = self.chunk_dataset[i]
+                    # get the chunk
+                    chunk = self.get_chunk(f, dataset_index, start_frame)
+                    # fit the scaler
+                    self.scaler.partial_fit(chunk.squeeze(0).numpy())
         else:
-            # stack them together
-            tensors = torch.cat(self.whole_file_embeddings, dim=-1)
+            chunks = []
+            # for each chunk in the dataset
+            for i in pbar:
+                dataset_index, start_frame = i
+                # get the chunk
+                chunk = self.get_chunk_from_memory(
+                    int(dataset_index), start_frame)
+                chunks.append(chunk)
+            chunks = torch.cat(chunks, dim=0)
+            # print("chunks shape: ", chunks.shape)
+            # flatten to sequence only
+            chunks = chunks.view(-1, chunks.shape[-1])
+            # print("chunks shape: ", chunks.shape)
             # fit the scaler
-            self.scaler.fit(tensors.squeeze(0).numpy())
+            # self.scaler.partial_fit(chunk.squeeze(0).numpy())
+            self.scaler.fit(chunks.squeeze(0).numpy())
 
     def inverse_transform(self, data):
         # inverse transform the data with a scaler fit to the chunks ds
@@ -580,7 +597,7 @@ class Dataset_RAVEnc(Dataset):
         with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as f:
             # get progress bar form indices
             pbar = tqdm.tqdm(f.keys())
-            pbar.set_description("loading all embeddings in memory:")
+            pbar.set_description("loading all embeddings in memory")
             for i in pbar:
                 self.whole_file_embeddings.append(
                     torch.from_numpy(f[str(int(i))][()]))
@@ -634,6 +651,7 @@ class Dataset_RAVEnc(Dataset):
                 self.chunk_dataset.append(
                     list((dataset_index, chunk_index)))
         self.chunk_dataset = np.array(self.chunk_dataset)
+        print("chunk dataset shape in memory: ", self.chunk_dataset.shape)
 
     def chunk_indices(self, tensor_length: int):
         """
@@ -699,4 +717,6 @@ class Dataset_RAVEnc(Dataset):
         seq_x = chunk[..., :self.seq_len]
         seq_y = chunk[..., self.seq_len -
                       self.label_len:self.seq_len+self.pred_len]
+        # print("seq_x shape: ", seq_x.shape)
+        # print("seq_y shape: ", seq_y.shape)
         return seq_x, seq_y
