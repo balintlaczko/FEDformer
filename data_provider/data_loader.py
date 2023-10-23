@@ -447,10 +447,10 @@ class Dataset_RAVEnc(Dataset):
     def __init__(
         self,
         root_path="/Volumes/T7RITMO/RAVE_encoded_datasets",
-        flag='train',
-        size=None,  # [seq_len, label_len, pred_len]
         data_path="vctk_rave_encoded.h5",
         csv_path="vctk_rave_encoded.csv",
+        flag='train',
+        size=None,  # [seq_len, label_len, pred_len]
         scale=True,
         all_in_memory=True,
     ) -> None:
