@@ -7,6 +7,8 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
 import warnings
+import h5py
+import tqdm
 
 warnings.filterwarnings('ignore')
 
@@ -448,15 +450,15 @@ class Dataset_RAVEnc(Dataset):
         flag='train',
         size=None,  # [seq_len, label_len, pred_len]
         data_path="vctk_rave_encoded.h5",
-        rave_model_id="vctk",
+        csv_path="vctk_rave_encoded.csv",
         scale=True,
-        timeenc=0,
+        all_in_memory=True,
     ) -> None:
         super().__init__()
 
         # parse size, if provided [seq_len, label_len, pred_len]
         if size == None:
-            # TODO: what should these values be for us?
+            # TODO: what should the default values be for us?
             self.seq_len = 32
             self.label_len = 8
             self.pred_len = 8
@@ -465,17 +467,227 @@ class Dataset_RAVEnc(Dataset):
             self.label_len = size[1]
             self.pred_len = size[2]
 
-        # ...
+        # parse flag
+        assert flag in ['train', 'test', 'val']
+        self.flag = flag
+
+        # parse paths to data
+        self.root_path = root_path
+        self.data_path = data_path
+        self.csv_path = csv_path
+
+        # parse options
+        self.scale = scale
+        self.all_in_memory = all_in_memory
+
+        # read data and generate chunked dataset
         self.__read_data__()
 
-    def __read_data__(self):
-        pass
+    def __read_data__(self) -> None:
+        """
+        Read the dataset, filter for the set we want (train/val/test),
+        then read all dataset elements in the chosen set and chunk them 
+        into seq_len + pred_len chunks, and return a dataset of samples 
+        where: ds[i] = (embedding_id, start_frame)
+        """
 
-    def __getitem__(self, index):
-        pass
+        # read the csv file
+        self.df = pd.read_csv(os.path.join(self.root_path, self.csv_path))
+        # filter for the set we want (train/val/test)
+        self.df = self.df[self.df.dataset == self.flag]
+
+        # load all embeddings in memory if needed
+        # and generate the chunk dataset
+        if self.all_in_memory:
+            self.load_all_in_memory()
+            self.generate_chunk_dataset_from_memory()
+        else:
+            self.generate_chunk_dataset()
+
+        # fit scaler if needed
+        if self.scale:
+            self.fit_scaler()
+
+    def __getitem__(self, index) -> tuple(torch.Tensor, torch.Tensor):
+        """
+        Get a sample from the dataset, where a sample is a tuple of:
+        (seq_x, seq_y). seq_x is the input sequence (start_frame --> start_frame + seq_len),
+        seq_y is the output sequence (start_frame + seq_len - label_len --> start_frame + seq_len + pred_len).
+
+        Args:
+            index: The index in the chunked dataset. We use it to look up the embedding id and start frame.
+
+        Returns:
+            tuple(torch.Tensor, torch.Tensor): The input and output sequences.
+        """
+        dataset_index, start_frame = self.chunk_dataset[index]
+        if not self.all_in_memory:
+            # fetch the embedding chunk from the h5 file
+            with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as h5_file:
+                chunk = self.get_chunk(h5_file, dataset_index, start_frame)
+        else:
+            chunk = self.get_chunk_from_memory(dataset_index, start_frame)
+        # scale the chunk if needed
+        if self.scale:
+            chunk = self.scaler.transform(chunk.squeeze(0).numpy())
+            chunk = torch.from_numpy(chunk).unsqueeze(0)
+        # extract the input and output sequences
+        seq_x, seq_y = self.get_x_y(chunk)
+        return seq_x, seq_y
 
     def __len__(self):
-        pass
+        # return the number of chunks
+        return self.chunk_dataset.shape[0]
+
+    def fit_scaler(self) -> None:
+        """
+        Fit a standard scaler to the dataset.
+        """
+        self.scaler = StandardScaler()
+        if not self.all_in_memory:
+            with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as f:
+                # get progress bar form indices
+                pbar = tqdm.tqdm(f.keys())
+                pbar.set_description("fitting standard scaler:")
+                tensors = [torch.from_numpy(f[str(int(i))][()]) for i in pbar]
+                # stack them together
+                tensors = torch.cat(tensors, dim=-1)
+                # fit the scaler
+                self.scaler.fit(tensors.squeeze(0).numpy())
+        else:
+            # stack them together
+            tensors = torch.cat(self.whole_file_embeddings, dim=-1)
+            # fit the scaler
+            self.scaler.fit(tensors.squeeze(0).numpy())
 
     def inverse_transform(self, data):
+        # inverse transform the data with a scaler fit to the chunks ds
         pass
+
+    def load_all_in_memory(self) -> None:
+        """
+        Load all embeddings in memory.
+        """
+        self.whole_file_embeddings = []
+        with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as f:
+            # get progress bar form indices
+            pbar = tqdm.tqdm(f.keys())
+            pbar.set_description("loading all embeddings in memory:")
+            for i in pbar:
+                self.whole_file_embeddings.append(
+                    torch.from_numpy(f[str(int(i))][()]))
+
+    def generate_chunk_dataset(self) -> None:
+        """
+        Generate a list of tuples (embedding_id, start_frame)
+        to get a dataset of chunks of length seq_len + pred_len.
+        For efficiency, we just save the index of the file embedding
+        from the h5 file, and the start frame of the chunk.
+        We can use that to extract the input and output sequences.
+        """
+        self.chunk_dataset = []
+        # open the h5 file
+        with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as h5_file:
+            # for each dataset in the csv file
+            for i, row in self.df.iterrows():
+                # get the dataset index
+                dataset_index = row["dataset_index"].values[0]
+                # retrieve the whole embedding as a tensor
+                embedding = h5_file[str(int(dataset_index))][()]
+                embedding = torch.from_numpy(embedding)
+                # generate the start frames for the chunks
+                chunk_indices = self.chunk_indices(embedding.shape[-1])
+                # append each chunk index with the dataset index to the chunk dataset
+                for chunk_index in chunk_indices:
+                    self.chunk_dataset.append(
+                        list((dataset_index, chunk_index)))
+        self.chunk_dataset = np.array(self.chunk_dataset)
+
+    def generate_chunk_dataset_from_memory(self) -> None:
+        """
+        Generate a list of tuples (embedding_id, start_frame)
+        to get a dataset of chunks of length seq_len + pred_len.
+        For efficiency, we just save the index of the file embedding
+        from the h5 file, and the start frame of the chunk.
+        We can use that to extract the input and output sequences.
+        """
+        self.chunk_dataset = []
+        # for each dataset in the csv file
+        for i, row in self.df.iterrows():
+            # get the dataset index
+            dataset_index = row["dataset_index"].values[0]
+            # retrieve the whole embedding as a tensor
+            embedding = self.whole_file_embeddings[dataset_index]
+            # generate the start frames for the chunks
+            chunk_indices = self.chunk_indices(embedding.shape[-1])
+            # append each chunk index with the dataset index to the chunk dataset
+            for chunk_index in chunk_indices:
+                self.chunk_dataset.append(
+                    list((dataset_index, chunk_index)))
+        self.chunk_dataset = np.array(self.chunk_dataset)
+
+    def chunk_indices(self, tensor_length: int) -> list(int):
+        """
+        Given the length of a tensor, return a list of inidices as
+        start frames for chunks of length seq_len + pred_len
+
+        Args:
+            tensor_length (int): The length of the tensor (sequence) to chunk into smaller sequences of length seq_len + pred_len.
+
+        Returns:
+            list: A list of indices as start frames for chunks of length seq_len + pred_len.
+        """
+        # get the number of chunks
+        num_chunks = tensor_length - (self.seq_len + self.pred_len)
+        # return the range of start indices
+        return list(range(num_chunks))
+
+    def get_chunk(self, h5_file: h5py.File, dataset_index: int, start_frame: int) -> torch.Tensor:
+        """
+        Given the h5 file, the dataset index, and the start frame,
+        return the chunk of length seq_len + pred_len.
+
+        Args:
+            h5_file (h5py.File): The opened h5 file.
+            dataset_index (int): The index of the tensor in the h5 file. The value under the column "dataset_index" in the corresponding csv file.
+            start_frame (int): The starting frame of the chunk within the entire sequence (that represents the whole audio file).
+
+        Returns:
+            torch.Tensor: The chunk of length seq_len + pred_len.
+        """
+        # read the full tensor from the h5 file
+        tensor = torch.from_numpy(h5_file[str(int(dataset_index))][()])
+        # extract the chunk
+        return tensor[..., start_frame:start_frame+self.seq_len+self.pred_len]
+
+    def get_chunk_from_memory(self, dataset_index: int, start_frame: int) -> torch.Tensor:
+        """
+        Given the dataset index, and the start frame,
+        return the chunk of length seq_len + pred_len.
+
+        Args:
+            dataset_index (int): The index of the tensor in the h5 file. The value under the column "dataset_index" in the corresponding csv file.
+            start_frame (int): The starting frame of the chunk within the entire sequence (that represents the whole audio file).
+
+        Returns:
+            torch.Tensor: The chunk of length seq_len + pred_len.
+        """
+        # read the full tensor of the embedded audio file
+        tensor = self.whole_file_embeddings[dataset_index]
+        # extract the chunk
+        return tensor[..., start_frame:start_frame+self.seq_len+self.pred_len]
+
+    def get_x_y(self, chunk: torch.Tensor) -> tuple(torch.Tensor, torch.Tensor):
+        """
+        Given a chunk of length seq_len + pred_len, return the input and output sequences.
+
+        Args:
+            chunk (torch.Tensor): The chunk of length seq_len + pred_len.
+
+        Returns:
+            tuple(torch.Tensor, torch.Tensor): The input and output sequences.
+        """
+        seq_x = chunk[..., :self.seq_len]
+        seq_y = chunk[..., self.seq_len -
+                      self.label_len:self.seq_len+self.pred_len]
+        return seq_x, seq_y
