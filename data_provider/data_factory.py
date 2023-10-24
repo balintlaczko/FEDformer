@@ -18,7 +18,9 @@ def data_provider(args, flag):
     if args.data.lower() == 'ravenc':
         shuffle_flag = flag == 'train'
         drop_last = flag == 'train'
-        batch_size = args.batch_size if flag == 'train' else 1
+        # keep batch size for pred to 1
+        # but for train, val and test use the batch size from args
+        batch_size = 1 if flag == 'pred' else args.batch_size
         data_set = Data(
             root_path=args.root_path,
             data_path=args.data_path,
