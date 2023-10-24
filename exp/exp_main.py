@@ -50,12 +50,21 @@ class Exp_Main(Exp_Basic):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
+            # for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
+            for i, data in enumerate(tqdm.tqdm(vali_loader)):
+                if self.args.embed == 'token_only':
+                    batch_x, batch_y = data
+                    batch_x_mark = None
+                    batch_y_mark = None
+                else:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark = data
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
 
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
+                if self.args.embed != 'token_only':
+                    # x_mark and y_mark are the encoded date and time of the input and output sequences
+                    batch_x_mark = batch_x_mark.float().to(self.device)
+                    batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
                 dec_inp = torch.zeros_like(
