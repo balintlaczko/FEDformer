@@ -46,12 +46,14 @@ class Exp_Main(Exp_Basic):
         criterion = nn.MSELoss()
         return criterion
 
-    def vali(self, vali_data, vali_loader, criterion):
+    def vali(self, vali_data, vali_loader, criterion, pbar_description='Validation'):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
             # for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
-            for i, data in enumerate(tqdm.tqdm(vali_loader)):
+            progress_bar = tqdm.tqdm(vali_loader)
+            progress_bar.set_description(pbar_description)
+            for i, data in enumerate(progress_bar):
                 if self.args.embed == 'token_only':
                     batch_x, batch_y = data
                     batch_x_mark = None
@@ -129,7 +131,9 @@ class Exp_Main(Exp_Basic):
             self.model.train()
             epoch_time = time.time()
             # for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
-            for i, data in enumerate(tqdm.tqdm(train_loader)):
+            progress_bar = tqdm.tqdm(train_loader)
+            progress_bar.set_description(f'Epoch {epoch + 1} train')
+            for i, data in enumerate(progress_bar):
                 if self.args.embed == 'token_only':
                     batch_x, batch_y = data
                     batch_x_mark = None
@@ -207,8 +211,10 @@ class Exp_Main(Exp_Basic):
             print("Epoch: {} cost time: {}".format(
                 epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
-            vali_loss = self.vali(vali_data, vali_loader, criterion)
-            test_loss = self.vali(test_data, test_loader, criterion)
+            vali_loss = self.vali(vali_data, vali_loader,
+                                  criterion, pbar_description="Validation set")
+            test_loss = self.vali(test_data, test_loader,
+                                  criterion, pbar_description="Test set")
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
@@ -239,12 +245,20 @@ class Exp_Main(Exp_Basic):
 
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            # for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            for i, data in enumerate(test_loader):
+                if self.args.embed == 'token_only':
+                    batch_x, batch_y = data
+                    batch_x_mark = None
+                    batch_y_mark = None
+                else:
+                    batch_x, batch_y, batch_x_mark, batch_y_mark = data
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
-
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
+                if self.args.embed != 'token_only':
+                    # x_mark and y_mark are the encoded date and time of the input and output sequences
+                    batch_x_mark = batch_x_mark.float().to(self.device)
+                    batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
                 dec_inp = torch.zeros_like(
