@@ -1,0 +1,7 @@
+Bootstrap: docker
+From: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
+
+# Apptainer definition file to run (train) the FEDformer model on HPC.
+
+%post
+    apt-get update
