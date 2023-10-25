@@ -5,4 +5,4 @@ From: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
 
 %post
     apt-get update
-    pip3 install absl-py einops h5p7 keopscore opt-einsum pandas pytorch-wavelet PyWavelets scikit-image scikit-learn scipy statsmodels sympy tqdm
+    pip3 install absl-py einops h5py keopscore opt-einsum pandas pytorch-wavelet PyWavelets scikit-image scikit-learn scipy statsmodels sympy tqdm
