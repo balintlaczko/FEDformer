@@ -1,3 +1,5 @@
+import lightning.pytorch as pl
+from lightning.pytorch.utilities.types import OptimizerLRScheduler
 import numpy as np
 import math
 from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp, series_decomp_multi
@@ -13,7 +15,40 @@ import sys
 sys.path.append("..")
 
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+class LitFEDformer(pl.LightningModule):
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+        self.model = Model(self.args)
+        self.loss = nn.MSELoss()
+
+    def training_step(self, batch, batch_idx):
+        batch_x, batch_y = batch
+
+        # decoder input
+        # create a tensor taking the labels and extending it with zeros for the predictions
+        # containter for the last pred_len time steps
+        dec_inp = torch.zeros_like(
+            batch_y[:, -self.args.pred_len:, :]).float()
+        # concatenate the first label_len time steps with the container
+        dec_inp = torch.cat(
+            [batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float()
+
+        outputs = self.model(batch_x, None, dec_inp, None)
+
+        f_dim = -1 if self.args.features == 'MS' else 0
+        batch_y = batch_y[:, -self.args.pred_len:, f_dim:]
+
+        loss = self.loss(outputs, batch_y)
+
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=self.args.learning_rate)
+        return optimizer
 
 
 class Model(nn.Module):

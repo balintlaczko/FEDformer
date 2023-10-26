@@ -5,6 +5,9 @@ import torch
 from exp.exp_main import Exp_Main
 import random
 import numpy as np
+import lightning.pytorch as pl
+from data_provider.data_factory import data_provider
+from models import FEDformer
 
 
 def main():
@@ -123,8 +126,8 @@ def main():
     parser.add_argument('--gpu', type=int, default=0, help='gpu')
     parser.add_argument('--use_multi_gpu', action='store_true',
                         help='use multiple gpus', default=False)
-    parser.add_argument('--devices', type=str, default='0,1',
-                        help='device ids of multi gpus')
+    parser.add_argument('--num_devices', type=int, default=1,
+                        help='number of gpus to use')
 
     args = parser.parse_args()
 
@@ -139,68 +142,12 @@ def main():
     print('Args in experiment:')
     print(args)
 
-    Exp = Exp_Main
+    data_set, data_loader = data_provider(args, "train")
+    fedformer = FEDformer.LitFEDformer(args)
 
-    if args.is_training:
-        for ii in range(args.itr):
-            # setting record of experiments
-            setting = '{}_{}_{}_modes{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
-                args.task_id,
-                args.model,
-                args.mode_select,
-                args.modes,
-                args.data,
-                args.features,
-                args.seq_len,
-                args.label_len,
-                args.pred_len,
-                args.d_model,
-                args.n_heads,
-                args.e_layers,
-                args.d_layers,
-                args.d_ff,
-                args.factor,
-                args.embed,
-                args.distil,
-                args.des,
-                ii)
-
-            exp = Exp(args)  # set experiments
-            print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
-            exp.train(setting)
-
-            # print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            # exp.test(setting)
-
-            # if args.do_predict:
-            #     print(
-            #         '>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            #     exp.predict(setting, True)
-
-            torch.cuda.empty_cache()
-    else:
-        ii = 0
-        setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.task_id,
-                                                                                                      args.model,
-                                                                                                      args.data,
-                                                                                                      args.features,
-                                                                                                      args.seq_len,
-                                                                                                      args.label_len,
-                                                                                                      args.pred_len,
-                                                                                                      args.d_model,
-                                                                                                      args.n_heads,
-                                                                                                      args.e_layers,
-                                                                                                      args.d_layers,
-                                                                                                      args.d_ff,
-                                                                                                      args.factor,
-                                                                                                      args.embed,
-                                                                                                      args.distil,
-                                                                                                      args.des, ii)
-
-        exp = Exp(args)  # set experiments
-        print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-        # exp.test(setting, test=1)
-        torch.cuda.empty_cache()
+    trainer = pl.Trainer(devices=args.num_devices, accelerator="gpu",
+                         max_epochs=args.train_epochs)
+    trainer.fit(model=fedformer, train_dataloaders=data_loader)
 
 
 if __name__ == "__main__":
