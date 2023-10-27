@@ -18,7 +18,7 @@ sys.path.append("..")
 
 class LitFEDformer(pl.LightningModule):
     def __init__(self, args):
-        super().__init__()
+        super(LitFEDformer, self).__init__()
         self.args = args
         self.model = Model_noif(self.args)
         self.loss = nn.MSELoss()
