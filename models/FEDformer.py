@@ -22,6 +22,7 @@ class LitFEDformer(pl.LightningModule):
         self.args = args
         self.model = Model(self.args)
         self.loss = nn.MSELoss()
+        # self.automatic_optimization = False
 
     def training_step(self, batch, batch_idx):
         batch_x, batch_y = batch
@@ -72,7 +73,9 @@ class LitFEDformer(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
             self.model.parameters(), lr=self.args.learning_rate)
-        return optimizer
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer, gamma=0.999)
+        return [optimizer], [scheduler]
 
 
 class Model(nn.Module):
