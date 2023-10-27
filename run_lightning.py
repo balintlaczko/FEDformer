@@ -6,6 +6,7 @@ from exp.exp_main import Exp_Main
 import random
 import numpy as np
 import lightning.pytorch as pl
+from lightning.pytorch.callbacks import ModelCheckpoint
 from data_provider.data_factory import data_provider
 from models import FEDformer
 
@@ -108,6 +109,8 @@ def main():
                         default=10, help='train epochs')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='batch size of train input data')
+    parser.add_argument('--train_steps_limit', type=int, default=-1, help='train steps limit. -1 means no limit')
+    parser.add_argument('--val_steps_limit', type=int, default=-1, help='validation steps limit. -1 means no limit')
     parser.add_argument('--patience', type=int, default=3,
                         help='early stopping patience')
     parser.add_argument('--learning_rate', type=float,
@@ -142,18 +145,30 @@ def main():
     print('Args in experiment:')
     print(args)
 
-    data_set, data_loader = data_provider(args, "train")
+    # create data loaders for train and val
+    _, train_loader = data_provider(args, "train")
+    _, val_loader = data_provider(args, "val", scaler=train_loader.dataset.scaler)
+
     fedformer = FEDformer.LitFEDformer(args)
 
+    # checkpoint callback
+    checkpoint_path = "./checkpoints/FEDformer/"
+    checkpoint_callback = ModelCheckpoint(
+        monitor="val_loss",
+        dirpath=checkpoint_path,
+        filename="model_hpc",
+        save_top_k=1,
+        mode="min",
+    )
+
+    train_steps_limit = args.train_steps_limit if args.train_steps_limit > 0 else None
+    val_steps_limit = args.val_steps_limit if args.val_steps_limit > 0 else None
+
     trainer = pl.Trainer(devices=args.num_devices, accelerator="gpu",
-                         max_epochs=args.train_epochs)
+                         max_epochs=args.train_epochs, enable_checkpointing=True, limit_train_batches=train_steps_limit, limit_val_batches=val_steps_limit, callbacks=[checkpoint_callback])
     
-    # attempt to fix issues with complex numbers...
-    # with trainer.init_module():
-    #     fedformer = FEDformer.LitFEDformer(args)
-
-
-    trainer.fit(model=fedformer, train_dataloaders=data_loader)
+    # debug test with small dataset
+    trainer.fit(model=fedformer, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
 
 if __name__ == "__main__":
