@@ -42,6 +42,31 @@ class LitFEDformer(pl.LightningModule):
 
         loss = self.loss(outputs, batch_y)
 
+        self.log('train_loss', loss, on_step=True, on_epoch=True)
+
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        batch_x, batch_y = batch
+
+        # decoder input
+        # create a tensor taking the labels and extending it with zeros for the predictions
+        # containter for the last pred_len time steps
+        dec_inp = torch.zeros_like(
+            batch_y[:, -self.args.pred_len:, :]).float()
+        # concatenate the first label_len time steps with the container
+        dec_inp = torch.cat(
+            [batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float()
+
+        outputs = self.model(batch_x, None, dec_inp, None)
+
+        f_dim = -1 if self.args.features == 'MS' else 0
+        batch_y = batch_y[:, -self.args.pred_len:, f_dim:]
+
+        loss = self.loss(outputs, batch_y)
+
+        self.log('val_loss', loss, on_step=True, on_epoch=True)
+
         return loss
 
     def configure_optimizers(self):
