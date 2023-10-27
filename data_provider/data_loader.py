@@ -453,6 +453,7 @@ class Dataset_RAVEnc(Dataset):
         size=None,  # [seq_len, label_len, pred_len]
         scale=True,
         all_in_memory=True,
+        scaler=None,
     ) -> None:
         super().__init__()
 
@@ -480,6 +481,9 @@ class Dataset_RAVEnc(Dataset):
         self.scale = scale
         self.all_in_memory = all_in_memory
 
+        # parse scaler
+        self.scaler = scaler
+
         # read data and generate chunked dataset
         self.__read_data__()
 
@@ -506,7 +510,9 @@ class Dataset_RAVEnc(Dataset):
 
         # fit scaler if needed
         if self.scale:
-            self.fit_scaler()
+            if self.flag == 'train':
+                self.fit_scaler()
+            assert self.scaler != None
 
     def __getitem__(self, index):
         """
@@ -651,7 +657,7 @@ class Dataset_RAVEnc(Dataset):
                 self.chunk_dataset.append(
                     list((dataset_index, chunk_index)))
         self.chunk_dataset = np.array(self.chunk_dataset)
-        print("chunk dataset shape in memory: ", self.chunk_dataset.shape)
+        # print("chunk dataset shape in memory: ", self.chunk_dataset.shape)
 
     def chunk_indices(self, tensor_length: int):
         """

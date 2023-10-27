@@ -11,7 +11,7 @@ data_dict = {
 }
 
 
-def data_provider(args, flag):
+def data_provider(args, flag, scaler=None):
     Data = data_dict[args.data]
 
     # for our RAVE encoded datasets
@@ -28,7 +28,8 @@ def data_provider(args, flag):
             flag=flag,
             size=[args.seq_len, args.label_len, args.pred_len],
             scale=True,
-            all_in_memory=True
+            all_in_memory=True,
+            scaler=scaler,
         )
         print(flag, len(data_set))
         data_loader = DataLoader(
