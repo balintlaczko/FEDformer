@@ -152,7 +152,7 @@ def main():
     fedformer = FEDformer.LitFEDformer(args)
 
     # checkpoint callback
-    checkpoint_path = "./checkpoints/FEDformer/"
+    checkpoint_path = "./checkpoints/"
     checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",
         dirpath=checkpoint_path,
