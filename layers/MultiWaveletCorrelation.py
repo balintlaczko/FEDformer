@@ -269,8 +269,14 @@ class sparseKernelFT1d(nn.Module):
 
         self.modes1 = alpha
         self.scale = (1 / (c * k * c * k))
-        self.weights1 = nn.Parameter(self.scale * torch.rand(c * k, c * k, self.modes1, dtype=torch.cfloat))
-        self.weights1.requires_grad = True
+        # self.weights1 = nn.Parameter(self.scale * torch.rand(c * k, c * k, self.modes1, dtype=torch.cfloat))
+        # self.weights1.requires_grad = True
+        # redo using simple floats, because NCCL Backend does not support ComplexFloat data type
+        # https://github.com/pytorch/pytorch/issues/71613
+        self.weights1_real = nn.Parameter(self.scale * torch.rand(c * k, c * k, self.modes1, dtype=torch.float32))
+        self.weights1_real.requires_grad = True
+        self.weights1_imag = nn.Parameter(self.scale * torch.rand(c * k, c * k, self.modes1, dtype=torch.float32))
+        self.weights1_imag.requires_grad = True
         self.k = k
 
     def compl_mul1d(self, x, weights):
@@ -287,7 +293,9 @@ class sparseKernelFT1d(nn.Module):
         l = min(self.modes1, N // 2 + 1)
         # l = N//2+1
         out_ft = torch.zeros(B, c * k, N // 2 + 1, device=x.device, dtype=torch.cfloat)
-        out_ft[:, :, :l] = self.compl_mul1d(x_fft[:, :, :l], self.weights1[:, :, :l])
+        weights1_complex = torch.complex(self.weights1_real, self.weights1_imag)
+        # out_ft[:, :, :l] = self.compl_mul1d(x_fft[:, :, :l], self.weights1[:, :, :l])
+        out_ft[:, :, :l] = self.compl_mul1d(x_fft[:, :, :l], weights1_complex[:, :, :l])
         x = torch.fft.irfft(out_ft, n=N)
         x = x.permute(0, 2, 1).view(B, N, c, k)
         return x

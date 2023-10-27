@@ -38,8 +38,14 @@ class FourierBlock(nn.Module):
         print('modes={}, index={}'.format(modes, self.index))
 
         self.scale = (1 / (in_channels * out_channels))
-        self.weights1 = nn.Parameter(
-            self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index), dtype=torch.cfloat))
+        # self.weights1 = nn.Parameter(
+        #     self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index), dtype=torch.cfloat))
+        # redo using simple floats, because NCCL Backend does not support ComplexFloat data type
+        # https://github.com/pytorch/pytorch/issues/71613
+        self.weights1_real = nn.Parameter(
+            self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index), dtype=torch.float32))
+        self.weights1_imag = nn.Parameter(
+            self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index), dtype=torch.float32))
 
     # Complex multiplication
     def compl_mul1d(self, input, weights):
@@ -54,8 +60,10 @@ class FourierBlock(nn.Module):
         x_ft = torch.fft.rfft(x, dim=-1)
         # Perform Fourier neural operations
         out_ft = torch.zeros(B, H, E, L // 2 + 1, device=x.device, dtype=torch.cfloat)
+        weights1_complex = torch.complex(self.weights1_real, self.weights1_imag)
         for wi, i in enumerate(self.index):
-            out_ft[:, :, :, wi] = self.compl_mul1d(x_ft[:, :, :, i], self.weights1[:, :, :, wi])
+            # out_ft[:, :, :, wi] = self.compl_mul1d(x_ft[:, :, :, i], self.weights1[:, :, :, wi])
+            out_ft[:, :, :, wi] = self.compl_mul1d(x_ft[:, :, :, i], weights1_complex[:, :, :, wi])
         # Return to time domain
         x = torch.fft.irfft(out_ft, n=x.size(-1))
         return (x, None)
@@ -81,8 +89,14 @@ class FourierCrossAttention(nn.Module):
         print('modes_kv={}, index_kv={}'.format(len(self.index_kv), self.index_kv))
 
         self.scale = (1 / (in_channels * out_channels))
-        self.weights1 = nn.Parameter(
-            self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index_q), dtype=torch.cfloat))
+        # self.weights1 = nn.Parameter(
+        #     self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index_q), dtype=torch.cfloat))
+        # redo using simple floats, because NCCL Backend does not support ComplexFloat data type
+        # https://github.com/pytorch/pytorch/issues/71613
+        self.weights1_real = nn.Parameter(
+            self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index_q), dtype=torch.float32))
+        self.weights1_imag = nn.Parameter(
+            self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index_q), dtype=torch.float32))
 
     # Complex multiplication
     def compl_mul1d(self, input, weights):
@@ -116,7 +130,9 @@ class FourierCrossAttention(nn.Module):
         else:
             raise Exception('{} actiation function is not implemented'.format(self.activation))
         xqkv_ft = torch.einsum("bhxy,bhey->bhex", xqk_ft, xk_ft_)
-        xqkvw = torch.einsum("bhex,heox->bhox", xqkv_ft, self.weights1)
+        weights1_complex = torch.complex(self.weights1_real, self.weights1_imag)
+        # xqkvw = torch.einsum("bhex,heox->bhox", xqkv_ft, self.weights1)
+        xqkvw = torch.einsum("bhex,heox->bhox", xqkv_ft, weights1_complex)
         out_ft = torch.zeros(B, H, E, L // 2 + 1, device=xq.device, dtype=torch.cfloat)
         for i, j in enumerate(self.index_q):
             out_ft[:, :, :, j] = xqkvw[:, :, :, i]
