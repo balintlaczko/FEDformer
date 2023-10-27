@@ -143,10 +143,16 @@ def main():
     print(args)
 
     data_set, data_loader = data_provider(args, "train")
-    fedformer = FEDformer.LitFEDformer(args)
+    # fedformer = FEDformer.LitFEDformer(args)
 
     trainer = pl.Trainer(devices=args.num_devices, accelerator="gpu",
                          max_epochs=args.train_epochs)
+    
+    # attempt to fix issues with complex numbers...
+    with trainer.init_module():
+        fedformer = FEDformer.LitFEDformer(args)
+
+
     trainer.fit(model=fedformer, train_dataloaders=data_loader)
 
 
