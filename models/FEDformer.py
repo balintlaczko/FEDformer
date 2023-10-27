@@ -1,5 +1,4 @@
 import lightning.pytorch as pl
-from lightning.pytorch.utilities.types import OptimizerLRScheduler
 import numpy as np
 import math
 from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp, series_decomp_multi
