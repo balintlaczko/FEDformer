@@ -164,8 +164,17 @@ def main():
     train_steps_limit = args.train_steps_limit if args.train_steps_limit > 0 else None
     val_steps_limit = args.val_steps_limit if args.val_steps_limit > 0 else None
 
-    trainer = pl.Trainer(devices=args.num_devices, accelerator="gpu",
-                         max_epochs=args.train_epochs, enable_checkpointing=True, limit_train_batches=train_steps_limit, limit_val_batches=val_steps_limit, callbacks=[checkpoint_callback])
+    trainer_strategy = "ddp_find_unused_parameters_true" if args.num_devices > 1 else "auto"
+    trainer = pl.Trainer(
+        strategy=trainer_strategy,
+        devices=args.num_devices, 
+        accelerator="gpu",
+        max_epochs=args.train_epochs, 
+        enable_checkpointing=True, 
+        limit_train_batches=train_steps_limit, 
+        limit_val_batches=val_steps_limit, 
+        callbacks=[checkpoint_callback],
+    )
     
     # debug test with small dataset
     trainer.fit(model=fedformer, train_dataloaders=train_loader, val_dataloaders=val_loader)
