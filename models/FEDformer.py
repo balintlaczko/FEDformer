@@ -265,10 +265,7 @@ class Model_noif(nn.Module):
 
         # Decomp
         kernel_size = configs.moving_avg
-        if isinstance(kernel_size, list):
-            self.decomp = series_decomp_multi(kernel_size)
-        else:
-            self.decomp = series_decomp(kernel_size)
+        self.decomp = series_decomp(kernel_size)
 
         # Embedding
         # The series-wise connection inherently contains the sequential information.
