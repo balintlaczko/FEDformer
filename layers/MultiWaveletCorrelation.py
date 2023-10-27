@@ -244,7 +244,8 @@ class FourierCrossAttentionW(nn.Module):
             xqk_ft = xqk_ft.tanh()
         elif self.activation == 'softmax':
             xqk_ft = torch.softmax(abs(xqk_ft), dim=-1)
-            xqk_ft = torch.complex(xqk_ft, torch.zeros_like(xqk_ft))
+            # xqk_ft = torch.complex(xqk_ft, torch.zeros_like(xqk_ft))
+            xqk_ft = torch.view_as_real(torch.complex(xqk_ft, torch.zeros_like(xqk_ft)))
         else:
             raise Exception('{} actiation function is not implemented'.format(self.activation))
         xqkv_ft = torch.einsum("bhxy,bhey->bhex", xqk_ft, xk_ft_)
