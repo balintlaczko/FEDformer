@@ -454,6 +454,7 @@ class Dataset_RAVEnc(Dataset):
         scale=True,
         all_in_memory=True,
         scaler=None,
+        train_set=None,
     ) -> None:
         super().__init__()
 
@@ -483,6 +484,11 @@ class Dataset_RAVEnc(Dataset):
 
         # parse scaler
         self.scaler = scaler
+
+        # optionally get whole file embeddings from train set
+        self.whole_file_embeddings = None
+        if train_set != None:
+            self.whole_file_embeddings = train_set.whole_file_embeddings
 
         # read data and generate chunked dataset
         self.__read_data__()
@@ -599,6 +605,9 @@ class Dataset_RAVEnc(Dataset):
         """
         Load all embeddings in memory.
         """
+        # guard clause to avoid loading the embeddings twice
+        if self.whole_file_embeddings != None:
+            return
         self.whole_file_embeddings = []
         with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as f:
             # get progress bar form indices

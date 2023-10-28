@@ -10,6 +10,32 @@ data_dict = {
     'RAVEnc': Dataset_RAVEnc,
 }
 
+def data_provider_ravenc(args, flag, scaler=None, train_set=None):
+    shuffle_flag = flag == 'train'
+    drop_last = flag == 'train'
+    # keep batch size for pred to 1
+    # but for train, val and test use the batch size from args
+    batch_size = 1 if flag == 'pred' else args.batch_size
+    data_set = Dataset_RAVEnc(
+        root_path=args.root_path,
+        data_path=args.data_path,
+        csv_path=args.csv_path,
+        flag=flag,
+        size=[args.seq_len, args.label_len, args.pred_len],
+        scale=True,
+        all_in_memory=True,
+        scaler=scaler,
+        train_set=train_set,
+    )
+    print(flag, len(data_set))
+    data_loader = DataLoader(
+        data_set,
+        batch_size=batch_size,
+        shuffle=shuffle_flag,
+        num_workers=args.num_workers,
+        drop_last=drop_last)
+    return data_set, data_loader
+
 
 def data_provider(args, flag, scaler=None):
     Data = data_dict[args.data]
