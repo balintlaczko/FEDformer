@@ -38,7 +38,8 @@ class LitFEDformer(pl.LightningModule):
 
         outputs = self.model(batch_x, None, dec_inp, None)
 
-        f_dim = -1 if self.args.features == 'MS' else 0
+        # f_dim = -1 if self.args.features == 'MS' else 0
+        f_dim = 0
         batch_y = batch_y[:, -self.args.pred_len:, f_dim:]
 
         loss = self.loss(outputs, batch_y)
@@ -61,7 +62,8 @@ class LitFEDformer(pl.LightningModule):
 
         outputs = self.model(batch_x, None, dec_inp, None)
 
-        f_dim = -1 if self.args.features == 'MS' else 0
+        # f_dim = -1 if self.args.features == 'MS' else 0
+        f_dim = 0
         batch_y = batch_y[:, -self.args.pred_len:, f_dim:]
 
         loss = self.loss(outputs, batch_y)
@@ -254,14 +256,15 @@ class Model_noif(nn.Module):
 
     def __init__(self, configs):
         super(Model_noif, self).__init__()
-        self.version = configs.version
+        # self.version = configs.version
         self.mode_select = configs.mode_select
         self.modes = configs.modes
         self.seq_len = configs.seq_len
         self.label_len = configs.label_len
         self.pred_len = configs.pred_len
-        self.output_attention = configs.output_attention
-        self.embed = configs.embed
+        # self.output_attention = configs.output_attention
+        self.output_attention = False
+        # self.embed = configs.embed
 
         # Decomp
         kernel_size = configs.moving_avg
@@ -372,26 +375,16 @@ class Model_noif(nn.Module):
         seasonal_init = F.pad(
             seasonal_init[:, -self.label_len:, :], (0, 0, 0, self.pred_len))  # [B, T, C], t = label_len + pred_len
         # enc
-        if self.embed.lower() == 'token_only':
-            enc_out = self.enc_embedding(x_enc)
-        else:
-            enc_out = self.enc_embedding(x_enc, x_mark_enc)  # [B, T, 512]
+        enc_out = self.enc_embedding(x_enc)
         enc_out, attns = self.encoder(enc_out, attn_mask=enc_self_mask)
         # dec
-        if self.embed.lower() == 'token_only':
-            dec_out = self.dec_embedding(x_dec)
-        else:
-            dec_out = self.dec_embedding(seasonal_init, x_mark_dec)
+        dec_out = self.dec_embedding(x_dec)
         seasonal_part, trend_part = self.decoder(dec_out, enc_out, x_mask=dec_self_mask, cross_mask=dec_enc_mask,
                                                  trend=trend_init)
         # final
         dec_out = trend_part + seasonal_part
 
-        if self.output_attention:
-            return dec_out[:, -self.pred_len:, :], attns
-        else:
-            # [B, L, D] (B, pred_len, 512)? or (B, pred_len, C)?
-            return dec_out[:, -self.pred_len:, :]
+        return dec_out[:, -self.pred_len:, :]
 
 
 if __name__ == '__main__':
