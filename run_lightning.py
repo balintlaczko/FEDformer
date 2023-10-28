@@ -164,7 +164,7 @@ def main():
     train_steps_limit = args.train_steps_limit if args.train_steps_limit > 0 else None
     val_steps_limit = args.val_steps_limit if args.val_steps_limit > 0 else None
 
-    trainer_strategy = "ddp_find_unused_parameters_true" if args.num_devices > 1 else "auto"
+    trainer_strategy = "ddp_find_unused_parameters_true" if args.num_devices != 1 else "auto"
     # trainer_strategy = "auto"
     trainer = pl.Trainer(
         strategy=trainer_strategy,
