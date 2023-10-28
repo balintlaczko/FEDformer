@@ -539,15 +539,20 @@ class Dataset_RAVEnc(Dataset):
                 chunk = self.get_chunk(h5_file, dataset_index, start_frame)
         else:
             chunk = self.get_chunk_from_memory(dataset_index, start_frame)
+        # reshape from BCT to BTC
+        chunk = chunk.transpose(1, 2)
         # scale the chunk if needed
         if self.scale:
             chunk = self.scaler.transform(chunk.squeeze(0).numpy())
             chunk = torch.from_numpy(chunk).unsqueeze(0)
         # extract the input and output sequences
-        seq_x, seq_y = self.get_x_y(chunk)
+        seq_x, seq_y = self.get_x_y(chunk) # now returns BTC
+
+        # commenting this out because we now convert to BTC earlier
         # rave embeddings are BCT, so we need to transpose them to BTC
-        seq_x = seq_x.transpose(1, 2)
-        seq_y = seq_y.transpose(1, 2)
+        # seq_x = seq_x.transpose(1, 2)
+        # seq_y = seq_y.transpose(1, 2)
+
         # print("seq_x shape: ", seq_x.shape)
         # print("seq_y shape: ", seq_y.shape)
         # return seq_x, seq_y  # as BTC
@@ -584,10 +589,15 @@ class Dataset_RAVEnc(Dataset):
                     int(dataset_index), start_frame)
                 chunks.append(chunk)
             chunks = torch.cat(chunks, dim=0)
-            # print("chunks shape: ", chunks.shape)
+            # print("chunks shape: ", chunks.shape) # (num_chunks, num_features, seq_len + pred_len)
             # flatten to sequence only
-            chunks = chunks.view(-1, chunks.shape[-1])
+            # chunks = chunks.view(-1, chunks.shape[-1]) # (num_chunks * num_features, seq_len + pred_len)
+            # flatten to features only
+            chunks = chunks.transpose(1, 2) # (num_chunks, seq_len + pred_len, num_features)
+            chunks = chunks.reshape(-1, chunks.shape[-1]) # (num_chunks * (seq_len + pred_len), num_features)
             # print("chunks shape: ", chunks.shape)
+            # print("chunks squeezed shape: ", chunks.squeeze(0).shape)
+
             # fit the scaler
             # self.scaler.partial_fit(chunk.squeeze(0).numpy())
             self.scaler.fit(chunks.squeeze(0).numpy())
@@ -729,9 +739,15 @@ class Dataset_RAVEnc(Dataset):
         Returns:
             tuple: The input and output sequences.
         """
-        seq_x = chunk[..., :self.seq_len]
-        seq_y = chunk[..., self.seq_len -
-                      self.label_len:self.seq_len+self.pred_len]
+        # chunk as BCT:
+        # seq_x = chunk[..., :self.seq_len]
+        # seq_y = chunk[..., self.seq_len -
+        #               self.label_len:self.seq_len+self.pred_len]
+
+        # chunk as BTC:
+        seq_x = chunk[:, :self.seq_len, :]
+        seq_y = chunk[:, self.seq_len -
+                      self.label_len:self.seq_len+self.pred_len, :]
         # print("seq_x shape: ", seq_x.shape)
         # print("seq_y shape: ", seq_y.shape)
         return seq_x, seq_y
