@@ -1,6 +1,8 @@
 import lightning.pytorch as pl
 import numpy as np
 import math
+import sys
+sys.path.append("..")
 from layers.Autoformer_EncDec import Encoder, Decoder, EncoderLayer, DecoderLayer, my_Layernorm, series_decomp, series_decomp_multi
 from layers.SelfAttention_Family import FullAttention, ProbAttention
 from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
@@ -10,8 +12,6 @@ from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import sys
-sys.path.append("..")
 
 
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -390,12 +390,12 @@ class Model_noif(nn.Module):
 if __name__ == '__main__':
     class Configs(object):
         ab = 0
-        modes = 32
+        modes = 64
         mode_select = 'random'
-        # version = 'Fourier'
-        version = 'Wavelets'
+        version = 'Fourier'
+        # version = 'Wavelets'
         # moving_avg = [12, 24]
-        moving_avg = [6, 12]
+        moving_avg = 6
         L = 1
         base = 'legendre'
         cross_activation = 'tanh'
@@ -405,10 +405,10 @@ if __name__ == '__main__':
         label_len = 16
         # pred_len = 96
         pred_len = 8
-        output_attention = True
-        enc_in = 7
-        dec_in = 7
-        d_model = 16
+        output_attention = False
+        enc_in = 8
+        dec_in = 8
+        d_model = 512
         # embed = 'timeF'
         embed = 'token_only'
         dropout = 0.05
@@ -418,19 +418,19 @@ if __name__ == '__main__':
         d_ff = 16
         e_layers = 2
         d_layers = 1
-        c_out = 7
+        c_out = 8
         activation = 'gelu'
         wavelet = 0
 
     configs = Configs()
-    model = Model(configs)
+    model = Model_noif(configs)
 
     print('parameter number is {}'.format(sum(p.numel()
           for p in model.parameters())))
-    enc = torch.randn([3, configs.seq_len, 7])
-    enc_mark = torch.randn([3, configs.seq_len, 4])
+    enc = torch.randn([3, configs.seq_len, 8])
+    # enc_mark = torch.randn([3, configs.seq_len, 4])
 
-    dec = torch.randn([3, configs.seq_len//2+configs.pred_len, 7])
-    dec_mark = torch.randn([3, configs.seq_len//2+configs.pred_len, 4])
-    out = model.forward(enc, enc_mark, dec, dec_mark)
-    print(out)
+    dec = torch.randn([3, configs.seq_len//2+configs.pred_len, 8])
+    # dec_mark = torch.randn([3, configs.seq_len//2+configs.pred_len, 4])
+    out = model.forward(enc, None, dec, None)
+    print(out.shape)
