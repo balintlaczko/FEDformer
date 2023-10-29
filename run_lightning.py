@@ -131,6 +131,7 @@ def main():
     #                     help='use multiple gpus', default=False)
     parser.add_argument('--num_devices', type=int, default=-1,
                         help='number of gpus to use')
+    parser.add_argument('--resume_ckpt_path', type=str, default=None,)
 
     args = parser.parse_args()
 
@@ -178,7 +179,7 @@ def main():
     )
     
     # debug test with small dataset
-    trainer.fit(model=fedformer, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    trainer.fit(model=fedformer, train_dataloaders=train_loader, val_dataloaders=val_loader, ckpt_path=args.resume_ckpt_path)
 
 
 if __name__ == "__main__":
