@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 # %%
 # load the log file
-log_file = os.path.join(os.getcwd(), 'lightning_logs', 'version_13', 'metrics.csv')
+log_file = os.path.join(os.getcwd(), 'lightning_logs', 'version_15', 'metrics.csv')
 df = pd.read_csv(log_file)
 
 # %%
