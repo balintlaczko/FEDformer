@@ -3,15 +3,22 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import argparse
 
 # %%
-# load the log files
-log_file_1 = os.path.join(os.getcwd(), 'lightning_logs', 'version_15', 'metrics.csv')
-log_file_2 = os.path.join(os.getcwd(), 'lightning_logs', 'version_16', 'metrics.csv')
-df_1 = pd.read_csv(log_file_1)
-df_2 = pd.read_csv(log_file_2)
-# combine the two dataframes
-df = pd.concat([df_1, df_2])
+# parse arguments
+parser = argparse.ArgumentParser(description='Plot the logs')
+parser.add_argument('--log_files', nargs='+', default=[], help='log files')
+args = parser.parse_args()
+
+# %%
+# read all csv files into a list of dataframes
+dfs = []
+for log_file in args.log_files:
+    dfs.append(pd.read_csv(log_file))
+# combine the dataframes
+df = pd.concat(dfs)
+
 
 # %%
 # keep only columns epoch, train_loss_epoch, val_loss_epoch
@@ -44,7 +51,7 @@ plt.yscale('log')
 plt.xlabel('epoch')
 plt.ylabel('loss')
 plt.legend()
-plt.savefig(os.path.join(os.path.dirname(log_file_2), 'loss.png'))
+plt.savefig(os.path.join(os.path.dirname(args.log_files[-1]), 'loss.png'))
 plt.show()
 
 
