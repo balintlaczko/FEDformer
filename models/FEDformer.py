@@ -38,9 +38,7 @@ class LitFEDformer(pl.LightningModule):
 
         outputs = self.model(batch_x, None, dec_inp, None)
 
-        # f_dim = -1 if self.args.features == 'MS' else 0
-        f_dim = 0
-        batch_y = batch_y[:, -self.args.pred_len:, f_dim:]
+        batch_y = batch_y[:, -self.args.pred_len:, :]
 
         loss = self.loss(outputs, batch_y)
 
@@ -62,9 +60,7 @@ class LitFEDformer(pl.LightningModule):
 
         outputs = self.model(batch_x, None, dec_inp, None)
 
-        # f_dim = -1 if self.args.features == 'MS' else 0
-        f_dim = 0
-        batch_y = batch_y[:, -self.args.pred_len:, f_dim:]
+        batch_y = batch_y[:, -self.args.pred_len:, :]
 
         loss = self.loss(outputs, batch_y)
 
