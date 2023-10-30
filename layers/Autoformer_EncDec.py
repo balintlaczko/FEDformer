@@ -48,7 +48,9 @@ class moving_avg(nn.Module):
 
 class series_decomp(nn.Module):
     """
-    Series decomposition block
+    Series decomposition block.
+    Extracts the moving mean of the time series by a certain window size.
+    Returns the residual (input - moving mean) of the time series and the moving mean.
     """
 
     def __init__(self, kernel_size):
