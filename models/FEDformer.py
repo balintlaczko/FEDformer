@@ -8,7 +8,7 @@ from layers.SelfAttention_Family import FullAttention, ProbAttention
 from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
 from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
 from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
-from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding
+from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding, DataEmbedding_onlypos
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -264,7 +264,7 @@ class Model_noif(nn.Module):
         self.pred_len = configs.pred_len
         # self.output_attention = configs.output_attention
         self.output_attention = False
-        # self.embed = configs.embed
+        self.embed = configs.embed
 
         # Decomp
         kernel_size = configs.moving_avg
@@ -275,10 +275,18 @@ class Model_noif(nn.Module):
         # Thus, we can discard the position embedding of transformers.
         # d_model = 512
         # we use "token_only" for RAVE embeddings datasets
-        self.enc_embedding = TokenEmbedding(
-            configs.enc_in, configs.d_model)
-        self.dec_embedding = TokenEmbedding(
-            configs.dec_in, configs.d_model)
+        if self.embed.lower() == 'token_only':
+            self.enc_embedding = TokenEmbedding(
+                configs.enc_in, configs.d_model)
+            self.dec_embedding = TokenEmbedding(
+                configs.dec_in, configs.d_model)
+        elif self.embed.lower() == 'token_pos':
+            self.enc_embedding = DataEmbedding_onlypos(
+                configs.enc_in, configs.d_model)
+            self.dec_embedding = DataEmbedding_onlypos(
+                configs.dec_in, configs.d_model)
+        else:
+            raise NotImplementedError("Embedding type not implemented")
 
 
         encoder_self_att = FourierBlock(in_channels=configs.d_model,
@@ -434,6 +442,7 @@ if __name__ == '__main__':
 
         # embed = 'timeF'
         # embed = 'token_only'
+        embed = 'token_pos'
         # freq = 'h'
         # factor = 1
         # wavelet = 0
