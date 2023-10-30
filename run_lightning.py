@@ -7,6 +7,7 @@ import random
 import numpy as np
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.loggers import CSVLogger
 from data_provider.data_factory import data_provider_ravenc
 from models import FEDformer
 
@@ -92,8 +93,8 @@ def main():
     #                     help='whether to use distilling in encoder, using this argument means not using distilling',
     #                     default=True)
     parser.add_argument('--dropout', type=float, default=0.05, help='dropout')
-    # parser.add_argument('--embed', type=str, default='timeF',
-    #                     help='time features encoding, options:[timeF, fixed, learned]')
+    parser.add_argument('--embed', type=str, default='token_only',
+                        help='input embedding, options:[token_only, token_pos]')
     parser.add_argument('--activation', type=str,
                         default='gelu', help='activation')
     # parser.add_argument('--output_attention', action='store_true',
@@ -131,6 +132,9 @@ def main():
     #                     help='use multiple gpus', default=False)
     parser.add_argument('--num_devices', type=int, default=-1,
                         help='number of gpus to use')
+    
+    # checkpoint & logging
+    parser.add_argument('--ckpt_name', type=str, default='model_hpc', help='checkpoint name')
     parser.add_argument('--resume_ckpt_path', type=str, default=None,)
 
     args = parser.parse_args()
@@ -157,10 +161,13 @@ def main():
     checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",
         dirpath=checkpoint_path,
-        filename="model_hpc",
+        filename=args.ckpt_name,
         save_top_k=1,
         mode="min",
     )
+
+    # csv logger callback
+    csv_logger = CSVLogger(save_dir="./logs/", name=args.ckpt_name)
 
     train_steps_limit = args.train_steps_limit if args.train_steps_limit > 0 else None
     val_steps_limit = args.val_steps_limit if args.val_steps_limit > 0 else None
@@ -176,9 +183,9 @@ def main():
         limit_train_batches=train_steps_limit, 
         limit_val_batches=val_steps_limit, 
         callbacks=[checkpoint_callback],
+        logger=csv_logger,
     )
     
-    # debug test with small dataset
     trainer.fit(model=fedformer, train_dataloaders=train_loader, val_dataloaders=val_loader, ckpt_path=args.resume_ckpt_path)
 
 
