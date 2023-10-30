@@ -5,9 +5,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # %%
-# load the log file
-log_file = os.path.join(os.getcwd(), 'lightning_logs', 'version_15', 'metrics.csv')
-df = pd.read_csv(log_file)
+# load the log files
+log_file_1 = os.path.join(os.getcwd(), 'lightning_logs', 'version_15', 'metrics.csv')
+log_file_2 = os.path.join(os.getcwd(), 'lightning_logs', 'version_16', 'metrics.csv')
+df_1 = pd.read_csv(log_file_1)
+df_2 = pd.read_csv(log_file_2)
+# combine the two dataframes
+df = pd.concat([df_1, df_2])
 
 # %%
 # keep only columns epoch, train_loss_epoch, val_loss_epoch
@@ -40,7 +44,7 @@ plt.yscale('log')
 plt.xlabel('epoch')
 plt.ylabel('loss')
 plt.legend()
-plt.savefig(os.path.join(os.path.dirname(log_file), 'loss.png'))
+plt.savefig(os.path.join(os.path.dirname(log_file_2), 'loss.png'))
 plt.show()
 
 
