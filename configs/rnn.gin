@@ -1,0 +1,54 @@
+# DATASET 
+ROOT_PATH = "data/RAVE_encoded_datasets"
+DATA_PATH = "vctk_rave_encoded.h5"
+CSV_PATH = "vctk_rave_encoded.csv"
+
+# SEQUENCE (for rnn training)
+SEQ_LEN = 32
+LABEL_LEN = 0
+PRED_LEN = 1
+
+# OPTIMIZATION
+NUM_WORKERS = 0
+TRAIN_EPOCHS = 3000
+BATCH_SIZE = 8192
+TRAIN_STEPS_LIMIT = -1
+VAL_STEPS_LIMIT = -1
+NUM_DEVICES = 1
+CHECKPOINT_PATH = "./checkpoints/"
+CKPT_NAME = "model_rnn"
+RESUME_CKPT_PATH = "checkpoints/model_rnn-v12.ckpt"
+
+# MODEL
+RNNModel.input_size = 8
+RNNModel.hidden_size = 512
+RNNModel.output_size = 8
+RNNModel.num_layers = 1
+RNNModel.dropout = 0.1
+RNNModel.learning_rate = 0.001
+RNNModel.lr_gamma = 0.99
+
+# ============= TRAINING =============
+
+# DATALOADER
+train.batch_size = %BATCH_SIZE
+train.root_path = %ROOT_PATH
+train.data_path = %DATA_PATH
+train.csv_path = %CSV_PATH
+train.seq_len = %SEQ_LEN
+train.label_len = %LABEL_LEN
+train.pred_len = %PRED_LEN
+train.num_workers = %NUM_WORKERS
+
+# TRAINER
+train.train_epochs = %TRAIN_EPOCHS
+train.num_devices = %NUM_DEVICES
+train.train_steps_limit = %TRAIN_STEPS_LIMIT
+train.val_steps_limit = %VAL_STEPS_LIMIT
+
+# CALLBACKS
+train.checkpoints_dir = %CHECKPOINT_PATH
+train.checkpoint_name = %CKPT_NAME
+
+# FIT
+train.resume_ckpt_path = %RESUME_CKPT_PATH
