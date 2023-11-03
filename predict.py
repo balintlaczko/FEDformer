@@ -133,7 +133,7 @@ rave_model.eval()
 # choose random id
 id = np.random.randint(len(test_dataset))
 print(f'random seed id: {id}')
-generated_length = 500
+generated_length = 200
 num_generations = generated_length // args.pred_len
 # get the batch
 x, y = test_dataset[id]
