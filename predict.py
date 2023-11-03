@@ -161,6 +161,12 @@ with torch.no_grad():
 generated = torch.cat(generated, dim=1) # (1, generated_length, 8)
 print(generated.shape)
 
+# %%
+# use the train set scaler to inverse transform the generated predictions
+generated = generated.squeeze(0).cpu().numpy()
+generated = train_set.scaler.inverse_transform(generated)
+generated = torch.from_numpy(generated).unsqueeze(0).cuda()
+
 
 # %%
 # decode the generated predictions
