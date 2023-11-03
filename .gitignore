@@ -6,3 +6,5 @@ data/
 checkpoints/
 lightning_logs/
 logs/
+rave_pretrained_models/
+generated_audio/
