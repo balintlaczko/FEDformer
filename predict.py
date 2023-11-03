@@ -133,6 +133,8 @@ rave_model.eval()
 # choose random id
 id = np.random.randint(len(test_dataset))
 print(f'random seed id: {id}')
+dataset_id, _ = test_dataset.chunk_dataset[id]
+print(f'dataset id: {dataset_id}')
 generated_length = 200
 num_generations = generated_length // args.pred_len
 # get the batch
@@ -182,6 +184,7 @@ buffer = decoded.transpose(1, 2).squeeze(0).cpu().numpy()
 print(buffer.shape)
 destination_folder = "generated_audio"
 os.makedirs(destination_folder, exist_ok=True)
+output_file_name = f"{chosen_model}_FEDformer_generated_.wav"
 # VCTK is RAVE V1 - Default, that uses 44100 Hz sampling rate
 sf.write(os.path.join(destination_folder, "generated.wav"), buffer, 44100)
 # %%
