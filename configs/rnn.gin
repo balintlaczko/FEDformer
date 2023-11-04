@@ -1,7 +1,7 @@
 # DATASET 
 ROOT_PATH = "data/RAVE_encoded_datasets"
-DATA_PATH = "vctk_rave_encoded.h5"
-CSV_PATH = "vctk_rave_encoded.csv"
+DATA_PATH = "vctk_trimmed_rave_encoded.h5"
+CSV_PATH = "vctk_trimmed_rave_encoded.csv"
 
 # SEQUENCE (for rnn training)
 SEQ_LEN = 32
@@ -16,14 +16,14 @@ TRAIN_STEPS_LIMIT = -1
 VAL_STEPS_LIMIT = -1
 NUM_DEVICES = 1
 CHECKPOINT_PATH = "./checkpoints/"
-CKPT_NAME = "model_rnn"
-RESUME_CKPT_PATH = "checkpoints/model_rnn-v12.ckpt"
+CKPT_NAME = "model_rnn_silence_trimmed"
+RESUME_CKPT_PATH = None
 
 # MODEL
 RNNModel.input_size = 8
 RNNModel.hidden_size = 512
 RNNModel.output_size = 8
-RNNModel.num_layers = 1
+RNNModel.num_layers = 2
 RNNModel.dropout = 0.1
 RNNModel.learning_rate = 0.001
 RNNModel.lr_gamma = 0.99
