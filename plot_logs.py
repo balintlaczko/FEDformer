@@ -43,7 +43,7 @@ df.head()
 df = df[df.index % 2 == 1]
 df.head()
 # %%
-# plot the train and validation loss, use log scale for y axis
+# plot the train and validation loss
 plt.figure(figsize=(15, 10))
 plt.plot(df['epoch'], df['train_loss_epoch'], label='train_loss_epoch')
 plt.plot(df['epoch'], df['val_loss_epoch'], label='val_loss_epoch')
