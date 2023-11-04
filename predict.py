@@ -31,8 +31,8 @@ class Configs(object):
     cross_activation = 'tanh'
 
     root_path = 'data/RAVE_encoded_datasets'
-    data_path = 'vctk_rave_encoded.h5'
-    csv_path = 'vctk_rave_encoded.csv'
+    data_path = 'vctk_trimmed_rave_encoded.h5'
+    csv_path = 'vctk_trimmed_rave_encoded.csv'
 
     seq_len = 32
     label_len = 16
@@ -75,7 +75,7 @@ device = torch.device(cmd_args.device)
 
 # %%
 # load model
-checkpoint_path = "checkpoints/model_hpc-v1.ckpt"
+checkpoint_path = "checkpoints/model_hpc_silence_trimmed_high_prec.ckpt"
 checkpoint = torch.load(checkpoint_path, map_location=device)
 fedformer = FEDformer.LitFEDformer(args).to(device)
 fedformer.load_state_dict(checkpoint['state_dict'])
