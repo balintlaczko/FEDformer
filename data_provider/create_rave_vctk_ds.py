@@ -15,7 +15,7 @@ import torchaudio
 # %%
 # gather all flac files in vctk folder
 
-vctk_root_folder = "/Volumes/T7RITMO/VCTK/DS_10283_3443/VCTK-Corpus-0.92/wav48_silence_trimmed"
+vctk_root_folder = "D:/VCTK/DS_10283_3443/VCTK-Corpus-0.92/wav48_silence_trimmed"
 
 # crawl through the folder and find all the flac files
 flac_files = []
@@ -29,7 +29,7 @@ print(f"Found {len(flac_files)} flac files")
 
 # %%
 # load the vctk rave model
-models_folder = "/Users/balintl/Documents/Max 8/Library/ts_models/"
+models_folder = "../rave_pretrained_models"
 model_names = ["percussion", "darbouka_onnx",
                "nasa", "VCTK", "vintage", "wheel"]
 vctk_rave = torch.jit.load(os.path.join(models_folder, "VCTK.ts"))
@@ -37,7 +37,7 @@ vctk_rave.eval()
 
 # %%
 # Define the path to the h5 database
-db_path = "/Volumes/T7RITMO/RAVE_encoded_datasets/vctk_trimmed_rave_encoded.h5"
+db_path = "D:/RAVE_encoded_datasets/vctk_trimmed_rave_encoded.h5"
 
 # %%
 # write all encoded tensors to the h5 file
@@ -111,7 +111,7 @@ df_test["dataset"] = "test"
 df = pd.concat([df_train, df_val, df_test], axis=0)
 df = df.reset_index(drop=True)
 # save the dataframe to a csv file
-path_to_csv = "/Volumes/T7RITMO/RAVE_encoded_datasets/vctk_trimmed_rave_encoded.csv"
+path_to_csv = "D:/RAVE_encoded_datasets/vctk_trimmed_rave_encoded.csv"
 df.to_csv(path_to_csv, index=False)
 
 # %%
