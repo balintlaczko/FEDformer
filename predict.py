@@ -13,6 +13,13 @@ import tqdm
 # %%
 # parse arguments
 parser = argparse.ArgumentParser()
+parser.add_argument('--root_path', type=str, default='data/RAVE_encoded_datasets', help='root path of the data file')
+parser.add_argument('--data_path', type=str, default='vctk_trimmed_rave_encoded.h5', help='data file')
+parser.add_argument('--csv_path', type=str, default='vctk_trimmed_rave_encoded.csv', help='csv file')
+parser.add_argument('--d_model', type=int, default=256, help='dimension of model')
+parser.add_argument('--checkpoint_path', type=str, default='checkpoints/model_hpc_silence_trimmed_high_prec-v3.ckpt', help='path to model checkpoint')
+parser.add_argument('--rave_model_path', type=str, default='rave_pretrained_models/VCTK.ts', help='path to RAVE model')
+parser.add_argument('--rave_model_sr', type=int, default=44100, help='sampling rate of the RAVE model')
 parser.add_argument('--num_files', type=int, default=1, help='number of files to generate')
 parser.add_argument('--num_steps', type=int, default=100, help='number of embedding steps to generate per file')
 parser.add_argument('--output_folder', type=str, default='generated_audio', help='output folder to save generated audio')
@@ -30,9 +37,9 @@ class Configs(object):
     base = 'legendre'
     cross_activation = 'tanh'
 
-    root_path = 'data/RAVE_encoded_datasets'
-    data_path = 'vctk_trimmed_rave_encoded.h5'
-    csv_path = 'vctk_trimmed_rave_encoded.csv'
+    root_path = cmd_args.root_path
+    data_path = cmd_args.data_path
+    csv_path = cmd_args.csv_path
 
     seq_len = 32
     label_len = 16
@@ -41,7 +48,7 @@ class Configs(object):
     enc_in = 8
     dec_in = 8
     c_out = 8
-    d_model = 512
+    d_model = cmd_args.d_model
     n_heads = 8
     e_layers = 2
     d_layers = 1
@@ -75,7 +82,7 @@ device = torch.device(cmd_args.device)
 
 # %%
 # load model
-checkpoint_path = "checkpoints/model_hpc_silence_trimmed_high_prec.ckpt"
+checkpoint_path = cmd_args.checkpoint_path
 checkpoint = torch.load(checkpoint_path, map_location=device)
 fedformer = FEDformer.LitFEDformer(args).to(device)
 fedformer.load_state_dict(checkpoint['state_dict'])
@@ -84,9 +91,8 @@ fedformer.eval()
 
 # %%
 # load a pretrained RAVE model via torch.script
-models_folder = "rave_pretrained_models"
-chosen_model = "VCTK"
-rave_model = torch.jit.load(os.path.join(models_folder, chosen_model + ".ts"), map_location=device)
+chosen_model = os.path.basename(cmd_args.rave_model_path).split(".")[0]
+rave_model = torch.jit.load(cmd_args.rave_model_path, map_location=device)
 rave_model.eval()
 
 
@@ -146,7 +152,6 @@ for generation_id in progress_bar:
     # reshape to channels-last, squeeze batch dimension
     buffer = decoded.transpose(1, 2).squeeze(0).cpu().numpy()
     output_file_name = f"{chosen_model}_FEDformer_generated_{generation_id}.wav"
-    # VCTK is RAVE V1 - Default, that uses 44100 Hz sampling rate
-    sf.write(os.path.join(output_folder, output_file_name), buffer, 44100)
+    sf.write(os.path.join(output_folder, output_file_name), buffer, cmd_args.rave_model_sr)
 
 # %%
