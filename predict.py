@@ -16,8 +16,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str, default='data/RAVE_encoded_datasets', help='root path of the data file')
 parser.add_argument('--data_path', type=str, default='vctk_trimmed_rave_encoded.h5', help='data file')
 parser.add_argument('--csv_path', type=str, default='vctk_trimmed_rave_encoded.csv', help='csv file')
-parser.add_argument('--d_model', type=int, default=256, help='dimension of model')
-parser.add_argument('--checkpoint_path', type=str, default='checkpoints/model_hpc_silence_trimmed_high_prec-v3.ckpt', help='path to model checkpoint')
+parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
+parser.add_argument('--checkpoint_path', type=str, default='checkpoints/quantized-v1.ckpt', help='path to model checkpoint')
 parser.add_argument('--rave_model_path', type=str, default='rave_pretrained_models/VCTK.ts', help='path to RAVE model')
 parser.add_argument('--rave_model_sr', type=int, default=44100, help='sampling rate of the RAVE model')
 parser.add_argument('--num_files', type=int, default=1, help='number of files to generate')
@@ -68,13 +68,17 @@ class Configs(object):
     batch_size = 512
     num_workers = 8
 
+    quantize = True
+
 args = Configs()
+args_test = Configs()
+args_test.quantize = False
 
 # %%
 # create data loaders for train and val
 train_set, train_loader = data_provider_ravenc(args, "train")
-val_dataset, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, train_set=train_set)
-test_dataset, test_loader = data_provider_ravenc(args, "test", scaler=train_set.scaler, train_set=train_set)
+val_dataset, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, quantizer=train_set.quantizer, train_set=train_set)
+test_dataset, test_loader = data_provider_ravenc(args_test, "test", scaler=train_set.scaler, train_set=train_set)
 
 # %%
 # torch device
