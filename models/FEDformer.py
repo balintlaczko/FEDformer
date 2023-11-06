@@ -19,6 +19,7 @@ import torch.nn.functional as F
 class LitFEDformer(pl.LightningModule):
     def __init__(self, args):
         super(LitFEDformer, self).__init__()
+        self.save_hyperparameters()
         self.args = args
         self.model = Model_noif(self.args)
         self.loss = nn.MSELoss()
