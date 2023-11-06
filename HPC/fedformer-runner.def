@@ -10,4 +10,4 @@ From: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
     find /usr/ -name 'libcuda.so.*'
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-12.1/compat
     python -m cupyx.tools.install_library --cuda 12.x --library cutensor
-    pip3 install torchpq
+    pip3 install torchpq tensorboard
