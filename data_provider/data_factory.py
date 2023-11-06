@@ -10,7 +10,7 @@ data_dict = {
     'RAVEnc': Dataset_RAVEnc,
 }
 
-def data_provider_ravenc(args, flag, scaler=None, train_set=None):
+def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None):
     shuffle_flag = flag == 'train'
     drop_last = flag == 'train'
     # keep batch size for pred to 1
@@ -23,8 +23,10 @@ def data_provider_ravenc(args, flag, scaler=None, train_set=None):
         flag=flag,
         size=[args.seq_len, args.label_len, args.pred_len],
         scale=True,
+        quantize=True,
         all_in_memory=True,
         scaler=scaler,
+        quantizer=quantizer,
         train_set=train_set,
     )
     print(flag, len(data_set))

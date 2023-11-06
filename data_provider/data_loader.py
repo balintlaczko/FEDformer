@@ -9,6 +9,7 @@ from utils.timefeatures import time_features
 import warnings
 import h5py
 import tqdm
+from torchpq.clustering import KMeans
 
 warnings.filterwarnings('ignore')
 
@@ -452,8 +453,11 @@ class Dataset_RAVEnc(Dataset):
         flag='train',
         size=None,  # [seq_len, label_len, pred_len]
         scale=True,
-        all_in_memory=True,
         scaler=None,
+        quantize=False,
+        num_clusters=64,
+        quantizer=None,
+        all_in_memory=True,
         train_set=None,
     ) -> None:
         super().__init__()
@@ -484,6 +488,13 @@ class Dataset_RAVEnc(Dataset):
 
         # parse scaler
         self.scaler = scaler
+
+        # qunatizer
+        self.quantize = quantize
+        self.quantizer = quantizer
+        self.num_clusters = num_clusters
+        if self.quantize and self.quantizer == None:
+            self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
 
         # optionally get whole file embeddings from train set
         self.whole_file_embeddings = None
@@ -545,6 +556,12 @@ class Dataset_RAVEnc(Dataset):
         if self.scale:
             chunk = self.scaler.transform(chunk.squeeze(0).numpy())
             chunk = torch.from_numpy(chunk).unsqueeze(0)
+        # quantize the chunk if needed
+        if self.quantize:
+            # quantizer_labels = self.quantizer.predict(chunk.cuda().transpose(1, 2).squeeze(0))
+            quantizer_labels = self.quantizer.predict(chunk.transpose(1, 2).squeeze(0))
+            chunk = self.quantizer.centroids.transpose(0, 1)[quantizer_labels].unsqueeze(0)
+            # chunk = torch.from_numpy(chunk).unsqueeze(0)
         # extract the input and output sequences
         seq_x, seq_y = self.get_x_y(chunk) # now returns BTC
 
@@ -600,7 +617,15 @@ class Dataset_RAVEnc(Dataset):
 
             # fit the scaler
             # self.scaler.partial_fit(chunk.squeeze(0).numpy())
-            self.scaler.fit(chunks.squeeze(0).numpy())
+            # self.scaler.fit(chunks.squeeze(0).numpy())
+            chunks = self.scaler.fit_transform(chunks.squeeze(0).numpy())
+            chunks = torch.from_numpy(chunks)
+
+            # fit quantizer
+            if self.quantize:
+                self.cluster_ids_x = self.quantizer.fit(chunks.cuda().transpose(0, 1).contiguous())
+                self.quantizer = self.quantizer.cpu()
+                # self.cluster_centers = self.quantizer.centroids.transpose(0, 1)  # (self.num_clusters, 8)
 
     def inverse_transform(self, data):
         # inverse transform the data with a scaler fit to the chunks ds
