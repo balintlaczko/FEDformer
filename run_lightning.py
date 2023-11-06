@@ -138,6 +138,7 @@ def main():
     parser.add_argument('--resume_ckpt_path', type=str, default=None,)
 
     args = parser.parse_args()
+    args.quantize = True
 
     # args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 

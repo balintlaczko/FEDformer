@@ -23,7 +23,7 @@ def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None
         flag=flag,
         size=[args.seq_len, args.label_len, args.pred_len],
         scale=True,
-        quantize=True,
+        quantize=args.quantize,
         all_in_memory=True,
         scaler=scaler,
         quantizer=quantizer,
