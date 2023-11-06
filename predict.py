@@ -143,6 +143,10 @@ for generation_id in progress_bar:
 
     # %%
     # decode the generated predictions
+    # TODO: reset the RAVE model state between generations
+    # the ugly way
+    rave_model = torch.jit.load(cmd_args.rave_model_path, map_location=device)
+    rave_model.eval()
     with torch.no_grad():
         # reshape generated to (1, 8, generated_length) and decode
         decoded = rave_model.decode(generated.transpose(1, 2))
