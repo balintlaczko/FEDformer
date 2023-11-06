@@ -7,7 +7,7 @@ import random
 import numpy as np
 import lightning.pytorch as pl
 from lightning.pytorch.callbacks import ModelCheckpoint
-from lightning.pytorch.loggers import CSVLogger
+from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from data_provider.data_factory import data_provider_ravenc
 from models import FEDformer
 
@@ -152,7 +152,7 @@ def main():
 
     # create data loaders for train and val
     train_set, train_loader = data_provider_ravenc(args, "train")
-    _, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, train_set=train_set)
+    _, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, quantizer=train_set.quantizer, train_set=train_set)
 
     fedformer = FEDformer.LitFEDformer(args)
 
@@ -168,6 +168,7 @@ def main():
 
     # csv logger callback
     csv_logger = CSVLogger(save_dir="./logs/", name=args.ckpt_name)
+    tensorboard_logger = TensorBoardLogger(save_dir="./logs/", name=args.ckpt_name)
 
     train_steps_limit = args.train_steps_limit if args.train_steps_limit > 0 else None
     val_steps_limit = args.val_steps_limit if args.val_steps_limit > 0 else None
@@ -183,12 +184,12 @@ def main():
         limit_train_batches=train_steps_limit, 
         limit_val_batches=val_steps_limit, 
         callbacks=[checkpoint_callback],
-        logger=csv_logger,
+        logger=[csv_logger, tensorboard_logger],
     )
     
     trainer.fit(model=fedformer, train_dataloaders=train_loader, val_dataloaders=val_loader, ckpt_path=args.resume_ckpt_path)
 
 
 if __name__ == "__main__":
-    torch.set_float32_matmul_precision("highest")
+    torch.set_float32_matmul_precision("high")
     main()
