@@ -46,6 +46,31 @@ class TokenEmbedding(nn.Module):
         return x
 
 
+class StepOffset(nn.Module):
+    """Offset values by the time step * step_offset"""
+    
+    def __init__(self, step_offset=1):
+        super(StepOffset, self).__init__()
+        self.step_offset = step_offset
+
+    def forward(self, x):
+        T = x.size(1)
+        offset = torch.arange(0, T, device=x.device).float() * self.step_offset
+        offset = offset.view(1, -1, 1)
+        return x + offset
+
+
+class SteppedTokenEmbedding(nn.Module):
+
+    def __init__(self, c_in, d_model, step_offset=1):
+        super(SteppedTokenEmbedding, self).__init__()
+        self.token_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
+        self.step_offset = StepOffset(step_offset=step_offset)
+
+    def forward(self, x):
+        return self.step_offset(self.token_embedding(x))
+
+
 class FixedEmbedding(nn.Module):
     """Seems to be the same sine/cosine positional embedding as in PositionalEmbedding but this one wraps it into a nn.Embedding with fixed weights"""
 

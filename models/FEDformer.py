@@ -8,7 +8,7 @@ from layers.SelfAttention_Family import FullAttention, ProbAttention
 from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
 from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
 from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
-from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding, DataEmbedding_onlypos
+from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding, DataEmbedding_onlypos, SteppedTokenEmbedding
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -281,6 +281,11 @@ class Model_noif(nn.Module):
             self.enc_embedding = DataEmbedding_onlypos(
                 configs.enc_in, configs.d_model)
             self.dec_embedding = DataEmbedding_onlypos(
+                configs.dec_in, configs.d_model)
+        elif self.embed.lower() == 'stepped_token':
+            self.enc_embedding = SteppedTokenEmbedding(
+                configs.enc_in, configs.d_model)
+            self.dec_embedding = SteppedTokenEmbedding(
                 configs.dec_in, configs.d_model)
         else:
             raise NotImplementedError("Embedding type not implemented")
