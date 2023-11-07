@@ -55,9 +55,9 @@ class StepOffset(nn.Module):
 
     def forward(self, x):
         T = x.size(1)
-        offset = torch.arange(0, T, device=x.device).float() * self.step_offset
+        offset = torch.arange(0, T, device=x.device).float() * self.step_offset / (T - 1) + 1
         offset = offset.view(1, -1, 1)
-        return x + offset
+        return x * offset
 
 
 class SteppedTokenEmbedding(nn.Module):
