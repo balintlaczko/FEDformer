@@ -8,7 +8,7 @@ from layers.SelfAttention_Family import FullAttention, ProbAttention
 from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
 from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
 from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
-from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding, DataEmbedding_onlypos, SteppedTokenEmbedding
+from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding, DataEmbedding_onlypos, SteppedTokenEmbedding, DataEmbedding_wo_pos_2
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -261,7 +261,7 @@ class Model_noif(nn.Module):
         self.pred_len = configs.pred_len
         # self.output_attention = configs.output_attention
         self.output_attention = False
-        self.embed = configs.embed
+        self.embed = configs.embed.lower()
 
         # Decomp
         kernel_size = configs.moving_avg
@@ -272,20 +272,25 @@ class Model_noif(nn.Module):
         # Thus, we can discard the position embedding of transformers.
         # d_model = 512
         # we use "token_only" for RAVE embeddings datasets
-        if self.embed.lower() == 'token_only':
+        if self.embed == 'token_only':
             self.enc_embedding = TokenEmbedding(
                 configs.enc_in, configs.d_model)
             self.dec_embedding = TokenEmbedding(
                 configs.dec_in, configs.d_model)
-        elif self.embed.lower() == 'token_pos':
+        elif self.embed == 'token_pos':
             self.enc_embedding = DataEmbedding_onlypos(
                 configs.enc_in, configs.d_model)
             self.dec_embedding = DataEmbedding_onlypos(
                 configs.dec_in, configs.d_model)
-        elif self.embed.lower() == 'stepped_token':
+        elif self.embed == 'stepped_token':
             self.enc_embedding = SteppedTokenEmbedding(
                 configs.enc_in, configs.d_model)
             self.dec_embedding = SteppedTokenEmbedding(
+                configs.dec_in, configs.d_model)
+        elif self.embed == 'step_feature':
+            self.enc_embedding = DataEmbedding_wo_pos_2(
+                configs.enc_in, configs.d_model)
+            self.dec_embedding = DataEmbedding_wo_pos_2(
                 configs.dec_in, configs.d_model)
         else:
             raise NotImplementedError("Embedding type not implemented")
@@ -368,7 +373,10 @@ class Model_noif(nn.Module):
         Returns:
             torch.Tensor: The predictions for the decoder. Shape: [B, pred_len, C] (I hope)
         """
-
+        step_feature_scale = None
+        if self.embed == 'step_feature':
+            step_feature_scale = torch.arange(0, self.seq_len + self.pred_len, device=x_enc.device) / (self.seq_len + self.pred_len - 1) - 0.5
+            step_feature_scale = step_feature_scale.unsqueeze(0).unsqueeze(-1).repeat(x_enc.shape[0], 1, 1)
         # print(f'Encoder input: x_enc.shape: {x_enc.shape}') # [B, T, C], t = seq_len
         # print(f'Prediction length: self.pred_len: {self.pred_len}') # t = pred_len
         # decomp init
@@ -390,7 +398,10 @@ class Model_noif(nn.Module):
         # print(f'Labels from seasonal and zeros for preds: seasonal_init.shape: {seasonal_init.shape}')
 
         # enc
-        enc_out = self.enc_embedding(x_enc) # [B, T, d_model], d_model = 512, t = seq_len
+        if self.embed == 'step_feature':
+            enc_out = self.enc_embedding(x_enc, step_feature_scale[:, :self.seq_len, :])
+        else:
+            enc_out = self.enc_embedding(x_enc) # [B, T, d_model], d_model = 512, t = seq_len
         # print(f'Embedded encoder input: enc_out.shape: {enc_out.shape}')
         enc_out, attns = self.encoder(enc_out, attn_mask=enc_self_mask) # [B, T, d_model], d_model = 512, t = seq_len AND len(attns) = 2
         # print(f'Encoder output: enc_out.shape: {enc_out.shape}')
@@ -399,7 +410,10 @@ class Model_noif(nn.Module):
 
         # dec
         # print(f'Decoder input (labels from sequence and zeros for pred_len): x_dec.shape: {x_dec.shape}') # [B, T, C], t = label_len + pred_len
-        dec_out = self.dec_embedding(x_dec) # [B, T, d_model], d_model = 512, t = label_len + pred_len
+        if self.embed == 'step_feature':
+            dec_out = self.dec_embedding(x_dec, step_feature_scale[:, self.seq_len - self.label_len:, :])
+        else:
+            dec_out = self.dec_embedding(x_dec) # [B, T, d_model], d_model = 512, t = label_len + pred_len
         # print(f'Embedded decoder input (labels from sequence and zeros for pred_len): dec_out.shape: {dec_out.shape}')
         seasonal_part, trend_part = self.decoder(dec_out, enc_out, x_mask=dec_self_mask, cross_mask=dec_enc_mask,
                                                  trend=trend_init)

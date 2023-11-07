@@ -212,3 +212,19 @@ class DataEmbedding_wo_pos(nn.Module):
         # except:
         #     a = 1
         return self.dropout(x)
+    
+class DataEmbedding_wo_pos_2(nn.Module):
+    """Using temporal embedding and the conv1d positional embedding but not the sine/cosine positional embedding"""
+
+    def __init__(self, c_in, d_model, dropout=0.1):
+        super(DataEmbedding_wo_pos_2, self).__init__()
+
+        # a Conv1d layer with kernel size 3
+        self.value_embedding = TokenEmbedding(c_in=c_in, d_model=d_model)
+        # a Linear layer that transforms a frequency map to the final embedding (TimeFeatureEmbedding)
+        self.time_feature_embedding = TimeFeatureEmbedding(d_model=d_model, freq='a') # freq='a' means yearly, so 1D
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x, x_mark):
+        x = self.value_embedding(x) + self.time_feature_embedding(x_mark)
+        return self.dropout(x)
