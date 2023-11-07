@@ -289,9 +289,9 @@ class Model_noif(nn.Module):
                 configs.dec_in, configs.d_model)
         elif self.embed == 'step_feature':
             self.enc_embedding = DataEmbedding_wo_pos_2(
-                configs.enc_in, configs.d_model)
+                configs.enc_in, configs.d_model, dropout=configs.dropout)
             self.dec_embedding = DataEmbedding_wo_pos_2(
-                configs.dec_in, configs.d_model)
+                configs.dec_in, configs.d_model, dropout=configs.dropout)
         else:
             raise NotImplementedError("Embedding type not implemented")
 
