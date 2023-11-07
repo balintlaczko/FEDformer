@@ -88,6 +88,11 @@ def main():
                         help='dimension of fcn')
     parser.add_argument(
         '--moving_avg', type=int, default=6, help='window size of moving average')
+    
+    # data scaling and quantization
+    parser.add_argument('--scale', type=int, default=1, help='whether to scale data')
+    parser.add_argument('--quantize', type=int, default=1, help='whether to quantize data')
+    parser.add_argument('--quantizer_num_clusters', type=int, default=64, help='number of clusters for quantizer')
     # parser.add_argument('--factor', type=int, default=1, help='attn factor')
     # parser.add_argument('--distil', action='store_false',
     #                     help='whether to use distilling in encoder, using this argument means not using distilling',
@@ -136,6 +141,9 @@ def main():
     # checkpoint & logging
     parser.add_argument('--ckpt_name', type=str, default='model_hpc', help='checkpoint name')
     parser.add_argument('--resume_ckpt_path', type=str, default=None,)
+
+    # quick comment
+    parser.add_argument('--comment', type=str, default='', help='add a comment if needed')
 
     args = parser.parse_args()
     args.quantize = True

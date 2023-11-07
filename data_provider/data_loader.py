@@ -526,10 +526,10 @@ class Dataset_RAVEnc(Dataset):
             self.generate_chunk_dataset()
 
         # fit scaler if needed
-        if self.scale:
+        if self.scale or self.quantize:
             if self.flag == 'train':
                 self.fit_scaler()
-            assert self.scaler != None
+            # assert self.scaler != None
 
     def __getitem__(self, index):
         """
@@ -618,8 +618,9 @@ class Dataset_RAVEnc(Dataset):
             # fit the scaler
             # self.scaler.partial_fit(chunk.squeeze(0).numpy())
             # self.scaler.fit(chunks.squeeze(0).numpy())
-            chunks = self.scaler.fit_transform(chunks.squeeze(0).numpy())
-            chunks = torch.from_numpy(chunks)
+            if self.scale:
+                chunks = self.scaler.fit_transform(chunks.squeeze(0).numpy())
+                chunks = torch.from_numpy(chunks)
 
             # fit quantizer
             if self.quantize:

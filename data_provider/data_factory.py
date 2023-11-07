@@ -13,6 +13,10 @@ data_dict = {
 def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None):
     shuffle_flag = flag == 'train'
     drop_last = flag == 'train'
+    scale_flag = args.scale > 0
+    quantize_flag = args.quantize > 0
+    if flag == 'test':
+        quantize_flag = False
     # keep batch size for pred to 1
     # but for train, val and test use the batch size from args
     batch_size = 1 if flag == 'pred' else args.batch_size
@@ -22,8 +26,9 @@ def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None
         csv_path=args.csv_path,
         flag=flag,
         size=[args.seq_len, args.label_len, args.pred_len],
-        scale=True,
-        quantize=args.quantize,
+        scale=scale_flag,
+        quantize=quantize_flag,
+        num_clusters=args.quantizer_num_clusters,
         all_in_memory=True,
         scaler=scaler,
         quantizer=quantizer,
