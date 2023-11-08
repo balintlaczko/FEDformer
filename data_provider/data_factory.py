@@ -15,8 +15,8 @@ def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None
     drop_last = flag == 'train'
     scale_flag = args.scale > 0
     quantize_flag = args.quantize > 0
-    if flag == 'test':
-        quantize_flag = False
+    # if flag == 'test':
+    #     quantize_flag = False
     # keep batch size for pred to 1
     # but for train, val and test use the batch size from args
     batch_size = 1 if flag == 'pred' else args.batch_size
