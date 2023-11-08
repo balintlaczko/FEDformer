@@ -91,6 +91,7 @@ def main():
     
     # data scaling and quantization
     parser.add_argument('--scale', type=int, default=1, help='whether to scale data')
+    parser.add_argument('--scaler_load_path', type=str, default='checkpoints/scaler.pkl', help='path to where to load the fit scaler from')
     parser.add_argument('--quantize', type=int, default=1, help='whether to quantize data')
     parser.add_argument('--quantizer_num_clusters', type=int, default=64, help='number of clusters for quantizer')
     parser.add_argument('--quantizer_load_path', type=str, default='checkpoints/quantizer.pt', help='path to where to load the fit k-means quantizer from')
@@ -103,15 +104,10 @@ def main():
                         help='input embedding, options:[token_only, token_pos]')
     parser.add_argument('--activation', type=str,
                         default='gelu', help='activation')
-    # parser.add_argument('--output_attention', action='store_true',
-    #                     help='whether to output attention in ecoder')
-    # parser.add_argument('--do_predict', action='store_true',
-    #                     help='whether to predict unseen future data')
 
     # optimization
     parser.add_argument('--num_workers', type=int,
                         default=10, help='data loader num workers')
-    # parser.add_argument('--itr', type=int, default=3, help='experiments times')
     parser.add_argument('--train_epochs', type=int,
                         default=10, help='train epochs')
     parser.add_argument('--batch_size', type=int, default=32,
@@ -132,10 +128,6 @@ def main():
     #                     help='use automatic mixed precision training', default=False)
 
     # GPU
-    # parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
-    # parser.add_argument('--gpu', type=int, default=0, help='gpu')
-    # parser.add_argument('--use_multi_gpu', action='store_true',
-    #                     help='use multiple gpus', default=False)
     parser.add_argument('--num_devices', type=int, default=-1,
                         help='number of gpus to use')
     
@@ -149,22 +141,11 @@ def main():
     args = parser.parse_args()
     args.quantize = True
 
-    # args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
-
-    # if args.use_gpu and args.use_multi_gpu:
-    #     args.dvices = args.devices.replace(' ', '')
-    #     device_ids = args.devices.split(',')
-    #     args.device_ids = [int(id_) for id_ in device_ids]
-    #     args.gpu = args.device_ids[0]
-
     print('Args in experiment:')
     print(args)
 
     # create data loaders for train and val
-    if args.quantizer_load_path is not None:
-        train_set, train_loader = data_provider_ravenc(args, "train", quantizer=args.quantizer_load_path)
-    else:
-        train_set, train_loader = data_provider_ravenc(args, "train")
+    train_set, train_loader = data_provider_ravenc(args, "train", scaler=args.scaler_load_path, quantizer=args.quantizer_load_path)
     _, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, quantizer=train_set.quantizer, train_set=train_set)
 
     fedformer = FEDformer.LitFEDformer(args)
