@@ -20,6 +20,7 @@ parser.add_argument('--scale', type=int, default=1, help='scale the data')
 parser.add_argument('--quantize', type=int, default=1, help='quantize the data')
 parser.add_argument('--quantizer_num_clusters', type=int, default=64, help='number of clusters for quantization')
 parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
+parser.add_argument('--embed', type=str, default='token_only', help='embedding type (token_only, step_offset, or step_feature)')
 parser.add_argument('--checkpoint_path', type=str, default='checkpoints/quantized-v1.ckpt', help='path to model checkpoint')
 parser.add_argument('--rave_model_path', type=str, default='rave_pretrained_models/VCTK.ts', help='path to RAVE model')
 parser.add_argument('--rave_model_sr', type=int, default=44100, help='sampling rate of the RAVE model')
@@ -63,7 +64,7 @@ class Configs(object):
 
     # embed = 'timeF'
     embed = 'token_only'
-    # embed = 'token_pos'
+    embed = cmd_args.embed
     # freq = 'h'
     # factor = 1
     # wavelet = 0

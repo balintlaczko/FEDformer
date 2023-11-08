@@ -493,8 +493,14 @@ class Dataset_RAVEnc(Dataset):
         self.quantize = quantize
         self.quantizer = quantizer
         self.num_clusters = num_clusters
-        if self.quantize and self.quantizer == None:
-            self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
+        self.quantizer_is_fit = False
+        if self.quantize:
+            if self.quantizer == None:
+                self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
+            elif type(quantizer) == str:
+                self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
+                self.quantizer.load_state_dict(torch.load(quantizer))
+                self.quantizer_is_fit = True
 
         # optionally get whole file embeddings from train set
         self.whole_file_embeddings = None
@@ -578,6 +584,14 @@ class Dataset_RAVEnc(Dataset):
     def __len__(self):
         # return the number of chunks
         return self.chunk_dataset.shape[0]
+    
+    def save_quantizer(self, destination_path: str):
+        """
+        Save the (fit) K-means quantizer to a file.
+        """
+        
+        torch.save(self.quantizer.state_dict(), destination_path)
+
 
     def fit_scaler(self) -> None:
         """
@@ -619,14 +633,21 @@ class Dataset_RAVEnc(Dataset):
             # self.scaler.partial_fit(chunk.squeeze(0).numpy())
             # self.scaler.fit(chunks.squeeze(0).numpy())
             if self.scale:
+                print("fitting scaler...")
                 chunks = self.scaler.fit_transform(chunks.squeeze(0).numpy())
+                print("scaler fitted")
                 chunks = torch.from_numpy(chunks)
 
             # fit quantizer
             if self.quantize:
-                self.cluster_ids_x = self.quantizer.fit(chunks.cuda().transpose(0, 1).contiguous())
+                if not self.quantizer_is_fit:
+                    print("fitting quantizer...")
+                    cluster_ids_x = self.quantizer.fit(chunks.cuda().transpose(0, 1).contiguous())
+                    print("quantizer fitted")
+                else:
+                    print("quantizer is already fitted")
                 self.quantizer = self.quantizer.cpu()
-                # self.cluster_centers = self.quantizer.centroids.transpose(0, 1)  # (self.num_clusters, 8)
+                
 
     def inverse_transform(self, data):
         # inverse transform the data with a scaler fit to the chunks ds

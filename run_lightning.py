@@ -93,6 +93,7 @@ def main():
     parser.add_argument('--scale', type=int, default=1, help='whether to scale data')
     parser.add_argument('--quantize', type=int, default=1, help='whether to quantize data')
     parser.add_argument('--quantizer_num_clusters', type=int, default=64, help='number of clusters for quantizer')
+    parser.add_argument('--quantizer_load_path', type=str, default='checkpoints/quantizer.pt', help='path to where to load the fit k-means quantizer from')
     # parser.add_argument('--factor', type=int, default=1, help='attn factor')
     # parser.add_argument('--distil', action='store_false',
     #                     help='whether to use distilling in encoder, using this argument means not using distilling',
@@ -160,7 +161,10 @@ def main():
     print(args)
 
     # create data loaders for train and val
-    train_set, train_loader = data_provider_ravenc(args, "train")
+    if args.quantizer_load_path is not None:
+        train_set, train_loader = data_provider_ravenc(args, "train", quantizer=args.quantizer_load_path)
+    else:
+        train_set, train_loader = data_provider_ravenc(args, "train")
     _, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, quantizer=train_set.quantizer, train_set=train_set)
 
     fedformer = FEDformer.LitFEDformer(args)
