@@ -10,6 +10,7 @@ import warnings
 import h5py
 import tqdm
 from torchpq.clustering import KMeans
+from pickle import dump, load
 
 warnings.filterwarnings('ignore')
 
@@ -487,7 +488,14 @@ class Dataset_RAVEnc(Dataset):
         self.all_in_memory = all_in_memory
 
         # parse scaler
-        self.scaler = scaler
+        self.scaler_is_fit = False
+        # if the argument is a string, load the pickled scaler from file
+        if type(scaler) == str:
+            self.scaler = load(open(scaler, 'rb'))
+        else:
+            self.scaler = scaler
+        if self.scaler != None:
+            self.scaler_is_fit = True
 
         # qunatizer
         self.quantize = quantize
@@ -535,7 +543,6 @@ class Dataset_RAVEnc(Dataset):
         if self.scale or self.quantize:
             if self.flag == 'train':
                 self.fit_scaler()
-            # assert self.scaler != None
 
     def __getitem__(self, index):
         """
@@ -585,11 +592,16 @@ class Dataset_RAVEnc(Dataset):
         # return the number of chunks
         return self.chunk_dataset.shape[0]
     
+    def save_scaler(self, destination_path: str):
+        """
+        Save the (fit) standard scaler to a file.
+        """
+        dump(self.scaler, open(destination_path, 'wb'))
+    
     def save_quantizer(self, destination_path: str):
         """
         Save the (fit) K-means quantizer to a file.
         """
-        
         torch.save(self.quantizer.state_dict(), destination_path)
 
 
@@ -597,57 +609,38 @@ class Dataset_RAVEnc(Dataset):
         """
         Fit a standard scaler to the dataset.
         """
+        # guard clause to avoid fitting the scaler twice
+        if self.scaler_is_fit:
+            print("scaler is already fitted")
+            self.quantizer = self.quantizer.cpu()
+            return
         self.scaler = StandardScaler()
         # get progress bar from chunks dataset
-        pbar = tqdm.tqdm(self.chunk_dataset)
+        pbar = tqdm.tqdm(self.whole_file_embeddings)
         pbar.set_description("fitting standard scaler")
-        if not self.all_in_memory:
-            with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as f:
-                # for each chunk in the dataset
-                for i in pbar:
-                    dataset_index, start_frame = self.chunk_dataset[i]
-                    # get the chunk
-                    chunk = self.get_chunk(f, dataset_index, start_frame)
-                    # fit the scaler
-                    self.scaler.partial_fit(chunk.squeeze(0).numpy())
-        else:
-            chunks = []
-            # for each chunk in the dataset
-            for i in pbar:
-                dataset_index, start_frame = i
-                # get the chunk
-                chunk = self.get_chunk_from_memory(
-                    int(dataset_index), start_frame)
-                chunks.append(chunk)
-            chunks = torch.cat(chunks, dim=0)
-            # print("chunks shape: ", chunks.shape) # (num_chunks, num_features, seq_len + pred_len)
-            # flatten to sequence only
-            # chunks = chunks.view(-1, chunks.shape[-1]) # (num_chunks * num_features, seq_len + pred_len)
-            # flatten to features only
-            chunks = chunks.transpose(1, 2) # (num_chunks, seq_len + pred_len, num_features)
-            chunks = chunks.reshape(-1, chunks.shape[-1]) # (num_chunks * (seq_len + pred_len), num_features)
-            # print("chunks shape: ", chunks.shape)
-            # print("chunks squeezed shape: ", chunks.squeeze(0).shape)
+        all_embeddings = torch.cat(self.whole_file_embeddings, dim=-1) # the embeddings are BCT
+        print("all embeddings shape: ", all_embeddings.shape)
+        # channels last
+        all_embeddings = all_embeddings.transpose(1, 2) # BTC
+        print("all embeddings shape: ", all_embeddings.shape)
 
-            # fit the scaler
-            # self.scaler.partial_fit(chunk.squeeze(0).numpy())
-            # self.scaler.fit(chunks.squeeze(0).numpy())
-            if self.scale:
-                print("fitting scaler...")
-                chunks = self.scaler.fit_transform(chunks.squeeze(0).numpy())
-                print("scaler fitted")
-                chunks = torch.from_numpy(chunks)
+        # fit the scaler
+        if self.scale:
+            print("fitting scaler...")
+            all_embeddings = self.scaler.fit_transform(all_embeddings.squeeze(0).numpy())
+            print("scaler fitted")
+            all_embeddings = torch.from_numpy(all_embeddings)
 
-            # fit quantizer
-            if self.quantize:
-                if not self.quantizer_is_fit:
-                    print("fitting quantizer...")
-                    cluster_ids_x = self.quantizer.fit(chunks.cuda().transpose(0, 1).contiguous())
-                    print("quantizer fitted")
-                else:
-                    print("quantizer is already fitted")
-                self.quantizer = self.quantizer.cpu()
-                
+        # fit quantizer
+        if self.quantize:
+            if not self.quantizer_is_fit:
+                print("fitting quantizer...")
+                cluster_ids_x = self.quantizer.fit(all_embeddings.cuda().transpose(0, 1).contiguous())
+                print("quantizer fitted")
+            else:
+                print("quantizer is already fitted")
+            self.quantizer = self.quantizer.cpu()
+
 
     def inverse_transform(self, data):
         # inverse transform the data with a scaler fit to the chunks ds
