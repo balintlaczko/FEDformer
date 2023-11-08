@@ -17,15 +17,17 @@ parser.add_argument('--root_path', type=str, default='data/RAVE_encoded_datasets
 parser.add_argument('--data_path', type=str, default='vctk_trimmed_rave_encoded.h5', help='data file')
 parser.add_argument('--csv_path', type=str, default='vctk_trimmed_rave_encoded.csv', help='csv file')
 parser.add_argument('--scale', type=int, default=1, help='scale the data')
+parser.add_argument('--scaler_load_path', type=str, default='checkpoints/scaler.pt', help='path to where to load the fit scaler from')
 parser.add_argument('--quantize', type=int, default=1, help='quantize the data')
-parser.add_argument('--quantizer_num_clusters', type=int, default=64, help='number of clusters for quantization')
+parser.add_argument('--quantizer_num_clusters', type=int, default=4096, help='number of clusters for quantization')
+parser.add_argument('--quantizer_load_path', type=str, default='checkpoints/quantizer.pt', help='path to where to load the fit k-means quantizer from')
 parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
 parser.add_argument('--embed', type=str, default='token_only', help='embedding type (token_only, step_offset, or step_feature)')
-parser.add_argument('--checkpoint_path', type=str, default='checkpoints/quantized-v1.ckpt', help='path to model checkpoint')
+parser.add_argument('--checkpoint_path', type=str, default='checkpoints/model_hpc_only_quantize-v13.ckpt', help='path to model checkpoint')
 parser.add_argument('--rave_model_path', type=str, default='rave_pretrained_models/VCTK.ts', help='path to RAVE model')
 parser.add_argument('--rave_model_sr', type=int, default=44100, help='sampling rate of the RAVE model')
 parser.add_argument('--num_files', type=int, default=1, help='number of files to generate')
-parser.add_argument('--num_steps', type=int, default=100, help='number of embedding steps to generate per file')
+parser.add_argument('--num_steps', type=int, default=256, help='number of embedding steps to generate per file')
 parser.add_argument('--output_folder', type=str, default='generated_audio', help='output folder to save generated audio')
 parser.add_argument('--device', type=str, default='cuda', help='device to use for inference (cpu or cuda). Default: cuda')
 cmd_args = parser.parse_args()
@@ -73,16 +75,16 @@ class Configs(object):
     num_workers = 8
 
     scale = cmd_args.scale
+    scaler_load_path = cmd_args.scaler_load_path
     quantize = cmd_args.quantize
     quantizer_num_clusters = cmd_args.quantizer_num_clusters
+    quantizer_load_path = cmd_args.quantizer_load_path
 
 args = Configs()
 
 # %%
-# create data loaders for train and val
-train_set, train_loader = data_provider_ravenc(args, "train")
-val_dataset, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, quantizer=train_set.quantizer, train_set=train_set)
-test_dataset, test_loader = data_provider_ravenc(args, "test", scaler=train_set.scaler, train_set=train_set)
+# create data loaders for test set
+test_dataset, test_loader = data_provider_ravenc(args, "test", scaler=args.scaler_load_path, quantizer=args.quantizer_load_path)
 
 # %%
 # torch device
@@ -146,7 +148,7 @@ for generation_id in progress_bar:
     # %%
     # use the train set scaler to inverse transform the generated predictions
     generated = generated.squeeze(0).cpu().numpy()
-    generated = train_set.scaler.inverse_transform(generated)
+    generated = test_dataset.scaler.inverse_transform(generated)
     generated = torch.from_numpy(generated).unsqueeze(0).to(device)
 
     # %%
@@ -157,11 +159,11 @@ for generation_id in progress_bar:
     rave_model.eval()
     with torch.no_grad():
         # reshape generated to (1, 8, generated_length) and decode
-        # decoded = rave_model.decode(generated.transpose(1, 2))
+        decoded = rave_model.decode(generated.transpose(1, 2))
         # sanity check with inputs
         # x = train_set.scaler.inverse_transform(x.squeeze(0).cpu().numpy())
         # x = torch.from_numpy(x).unsqueeze(0).to(device)
-        decoded = rave_model.decode(x.transpose(1, 2))
+        # decoded = rave_model.decode(x.transpose(1, 2))
 
     # %%
     # save decoded to wav file
