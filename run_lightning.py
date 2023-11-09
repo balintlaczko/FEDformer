@@ -129,8 +129,8 @@ def main():
     #                     help='use automatic mixed precision training', default=False)
 
     # GPU
-    parser.add_argument('--num_devices', type=int, default=-1,
-                        help='number of gpus to use')
+    parser.add_argument('--num_devices', type=int, nargs='*', default=[-1],
+                        help='number of gpus to use. if list it will be the device ids to use')
     
     # checkpoint & logging
     parser.add_argument('--ckpt_name', type=str, default='model_hpc', help='checkpoint name')
