@@ -19,6 +19,7 @@ parser.add_argument('--csv_path', type=str, default='vctk_trimmed_rave_encoded.c
 parser.add_argument('--scale', type=int, default=1, help='scale the data')
 parser.add_argument('--scaler_load_path', type=str, default='checkpoints/scaler.pt', help='path to where to load the fit scaler from')
 parser.add_argument('--quantize', type=int, default=1, help='quantize the data')
+parser.add_argument('--quantizer_type', type=str, default='kmeans', help='type of quantizer to use (kmeans or msprior)')
 parser.add_argument('--quantizer_num_clusters', type=int, default=4096, help='number of clusters for quantization')
 parser.add_argument('--quantizer_load_path', type=str, default='checkpoints/quantizer.pt', help='path to where to load the fit k-means quantizer from')
 parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
@@ -77,6 +78,7 @@ class Configs(object):
     scale = cmd_args.scale
     scaler_load_path = cmd_args.scaler_load_path
     quantize = cmd_args.quantize
+    quantizer_type = cmd_args.quantizer_type
     quantizer_num_clusters = cmd_args.quantizer_num_clusters
     quantizer_load_path = cmd_args.quantizer_load_path
 
