@@ -37,6 +37,7 @@ class Configs(object):
 
     scale = 1
     quantize = 1
+    quantizer_type = 'kmeans'
     quantizer_num_clusters = cmd_args.quantizer_num_clusters
 
 args = Configs()
