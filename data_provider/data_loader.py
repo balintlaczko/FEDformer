@@ -11,6 +11,7 @@ import h5py
 import tqdm
 from torchpq.clustering import KMeans
 from pickle import dump, load
+import math
 
 warnings.filterwarnings('ignore')
 
@@ -458,6 +459,7 @@ class Dataset_RAVEnc(Dataset):
         quantize=False,
         num_clusters=64,
         quantizer=None,
+        quantizer_type="kmeans",
         all_in_memory=True,
         train_set=None,
     ) -> None:
@@ -501,14 +503,20 @@ class Dataset_RAVEnc(Dataset):
         self.quantize = quantize
         self.quantizer = quantizer
         self.num_clusters = num_clusters
+        self.quantizer_type = quantizer_type
         self.quantizer_is_fit = False
         if self.quantize:
-            if self.quantizer == None:
-                self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
-            elif type(quantizer) == str:
-                self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
-                self.quantizer.load_state_dict(torch.load(quantizer))
-                self.quantizer_is_fit = True
+            if self.quantizer_type == "kmeans":
+                if self.quantizer == None:
+                    self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
+                elif type(quantizer) == str:
+                    self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
+                    self.quantizer.load_state_dict(torch.load(quantizer))
+                    self.quantizer_is_fit = True
+            elif self.quantizer_type == "msprior":
+                self.quantizer = self.msprior_quantizer
+            else:
+                raise NotImplementedError("quantizer type not implemented")
 
         # optionally get whole file embeddings from train set
         self.whole_file_embeddings = None
@@ -571,21 +579,14 @@ class Dataset_RAVEnc(Dataset):
             chunk = torch.from_numpy(chunk).unsqueeze(0)
         # quantize the chunk if needed
         if self.quantize:
-            # quantizer_labels = self.quantizer.predict(chunk.cuda().transpose(1, 2).squeeze(0))
-            quantizer_labels = self.quantizer.predict(chunk.transpose(1, 2).squeeze(0))
-            chunk = self.quantizer.centroids.transpose(0, 1)[quantizer_labels].unsqueeze(0)
-            # chunk = torch.from_numpy(chunk).unsqueeze(0)
+            if self.quantizer_type == "kmeans":
+                quantizer_labels = self.quantizer.predict(chunk.transpose(1, 2).squeeze(0))
+                chunk = self.quantizer.centroids.transpose(0, 1)[quantizer_labels].unsqueeze(0)
+            elif self.quantizer_type == "msprior":
+                chunk = self.quantizer(chunk, resolution=self.num_clusters)
         # extract the input and output sequences
         seq_x, seq_y = self.get_x_y(chunk) # now returns BTC
 
-        # commenting this out because we now convert to BTC earlier
-        # rave embeddings are BCT, so we need to transpose them to BTC
-        # seq_x = seq_x.transpose(1, 2)
-        # seq_y = seq_y.transpose(1, 2)
-
-        # print("seq_x shape: ", seq_x.shape)
-        # print("seq_y shape: ", seq_y.shape)
-        # return seq_x, seq_y  # as BTC
         return seq_x.squeeze(0), seq_y.squeeze(0)  # as TC
 
     def __len__(self):
@@ -604,6 +605,13 @@ class Dataset_RAVEnc(Dataset):
         """
         torch.save(self.quantizer.state_dict(), destination_path)
 
+    def msprior_quantizer(self, x, resolution=64):
+        # this part is from https://github.com/caillonantoine/msprior/blob/1e7b1e27b366e051bbc244613f07d1c62b7dc3a1/msprior_scripts/preprocess.py#L108
+        x = x / 2
+        x = .5 * (1 + torch.erf(x / math.sqrt(2)))
+        x = torch.floor(x * (resolution - 1))
+        x = x / (resolution - 1) - 0.5 # but this is me scaling it into [-0.5, 0.5]
+        return x
 
     def fit_scaler(self) -> None:
         """
@@ -612,7 +620,8 @@ class Dataset_RAVEnc(Dataset):
         # guard clause to avoid fitting the scaler twice
         if self.scaler_is_fit:
             print("scaler is already fitted")
-            self.quantizer = self.quantizer.cpu()
+            if self.quantizer_type == "kmeans":
+                self.quantizer = self.quantizer.cpu()
             return
         self.scaler = StandardScaler()
         # get progress bar from chunks dataset
