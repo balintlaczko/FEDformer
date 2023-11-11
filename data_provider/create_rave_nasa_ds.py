@@ -40,13 +40,19 @@ with h5py.File(db_path, 'w') as f:
     f.create_dataset(str(0), data=z.numpy())
 
 # %%
+# load the encoded tensor from the h5 file
+with h5py.File(db_path, 'r') as f:
+    z = f["0"][()]
+z = torch.from_numpy(z)
+
+# %%
 # take the z and divide it into 125 equal chunks
-z_chunks = torch.chunk(z, 125, dim=-1)
+z_chunks = torch.chunk(z, 1250, dim=-1)
 print(len(z_chunks))
 
 # %%
 # Define the path to the h5 database for the apollo audio split into 125 entries
-db_path_chunked = "../data/RAVE_encoded_datasets/nasa_rave_encoded_split.h5"
+db_path_chunked = "../data/RAVE_encoded_datasets/nasa_rave_encoded_split_2.h5"
 
 # %%
 # write all chunks to the h5 file
@@ -69,7 +75,7 @@ df_test["dataset"] = "test"
 df = pd.concat([df_train, df_val, df_test], axis=0)
 df = df.reset_index(drop=True)
 # save the dataframe to a csv file
-path_to_csv = "../data/RAVE_encoded_datasets/nasa_rave_encoded_split.csv"
+path_to_csv = "../data/RAVE_encoded_datasets/nasa_rave_encoded_split_2.csv"
 df.to_csv(path_to_csv, index=False)
 
 # %%
