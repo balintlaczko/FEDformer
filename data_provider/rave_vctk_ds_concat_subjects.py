@@ -79,14 +79,16 @@ subjects_concat_df.to_csv(path_to_csv, index=False)
 
 # %%
 # chunk each embedding into chunks
-num_chunks_per_subject = 32
+num_chunks_per_subject = 10
 subjects_embeddings_chunked = [torch.chunk(subject_embedding, num_chunks_per_subject, dim=-1) for subject_embedding in subjects_embeddings]
 subject_ids_chunked = []
 flat_chunks = []
+lengths = []
 for subject_id, subject_embeddings_chunked in zip(subjects_ids, subjects_embeddings_chunked):
     for i, subject_embedding_chunk in enumerate(subject_embeddings_chunked):
         subject_ids_chunked.append(subject_id)
         flat_chunks.append(subject_embedding_chunk)
+        lengths.append(subject_embedding_chunk.shape[-1])
 
 
 # %%
@@ -101,8 +103,29 @@ with h5py.File(new_db_path, 'w') as f:
 # create another dataframe with the subject ids and the dataset indices
 chunked_df = pd.DataFrame(subject_ids_chunked, columns=["subject_id"])
 chunked_df["dataset_index"] = [i for i in range(len(flat_chunks))]
-chunked_df_train, chunked_df_test = train_test_split(chunked_df, test_size=0.2, random_state=42)
-chunked_df_train, chunked_df_val = train_test_split(chunked_df_train, test_size=0.2, random_state=42)
+
+# %%
+# do train/val/test split for each subject
+train_samples = []
+val_samples = []
+test_samples = []
+
+for subject_id in tqdm.tqdm(chunked_df["subject_id"].unique()):
+    subject_df = chunked_df[chunked_df["subject_id"] == subject_id]
+    subject_df_train, subject_df_test = train_test_split(subject_df, test_size=0.2, random_state=42)
+    subject_df_train, subject_df_val = train_test_split(subject_df_train, test_size=0.2, random_state=42)
+    train_samples.append(subject_df_train)
+    val_samples.append(subject_df_val)
+    test_samples.append(subject_df_test)
+
+# chunked_df_train, chunked_df_test = train_test_split(chunked_df, test_size=0.2, random_state=42)
+# chunked_df_train, chunked_df_val = train_test_split(chunked_df_train, test_size=0.2, random_state=42)
+
+# merge all train/val/test samples into 3 dataframes
+chunked_df_train = pd.concat(train_samples, axis=0)
+chunked_df_val = pd.concat(val_samples, axis=0)
+chunked_df_test = pd.concat(test_samples, axis=0)
+
 # merge the 3 datasets into one
 chunked_df_train["dataset"] = "train"
 chunked_df_val["dataset"] = "val"
