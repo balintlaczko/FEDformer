@@ -152,13 +152,20 @@ def main():
     fedformer = FEDformer.LitFEDformer(args)
 
     # checkpoint callback
-    checkpoint_path = "./checkpoints/"
-    checkpoint_callback = ModelCheckpoint(
+    checkpoint_path = "./checkpoints/" + args.ckpt_name
+    val_checkpoint_callback = ModelCheckpoint(
         monitor="val_loss",
         dirpath=checkpoint_path,
-        filename=args.ckpt_name,
-        save_top_k=1,
+        filename=args.ckpt_name + "_val_{epoch:02d}-{val_loss:.4f}",
+        save_top_k=10,
         mode="min",
+    )
+    last_checkpoint_callback = ModelCheckpoint(
+        monitor="epoch",
+        dirpath=checkpoint_path,
+        filename=args.ckpt_name + "_last_{epoch:02d}",
+        save_top_k=1,
+        mode="max",
     )
 
     # csv logger callback
@@ -168,7 +175,7 @@ def main():
     train_steps_limit = args.train_steps_limit if args.train_steps_limit > 0 else None
     val_steps_limit = args.val_steps_limit if args.val_steps_limit > 0 else None
 
-    trainer_strategy = "ddp_find_unused_parameters_true" if args.num_devices != 1 else "auto"
+    trainer_strategy = "ddp_find_unused_parameters_true" if len(args.num_devices) != 1 else "auto"
     # trainer_strategy = "auto"
     trainer = pl.Trainer(
         strategy=trainer_strategy,
@@ -178,7 +185,7 @@ def main():
         enable_checkpointing=True, 
         limit_train_batches=train_steps_limit, 
         limit_val_batches=val_steps_limit, 
-        callbacks=[checkpoint_callback],
+        callbacks=[val_checkpoint_callback, last_checkpoint_callback],
         logger=[csv_logger, tensorboard_logger],
     )
     
