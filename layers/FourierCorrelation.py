@@ -36,7 +36,7 @@ class FourierBlock(nn.Module):
         # get modes on frequency domain
         self.index_ = get_frequency_modes(seq_len, modes=modes, mode_select_method=mode_select_method)
         print('modes={}, index={}'.format(modes, self.index_))
-        self.register_buffer("index", torch.tensor(self.index_, dtype=torch.int16))
+        self.register_buffer("index", torch.tensor(self.index_, dtype=torch.long))
 
         self.scale_ = (1 / (in_channels * out_channels))
         self.register_buffer("scale", torch.tensor(self.scale_, dtype=torch.float32))
@@ -86,9 +86,9 @@ class FourierCrossAttention(nn.Module):
         self.out_channels = out_channels
         # get modes for queries and keys (& values) on frequency domain
         self.index_q_ = get_frequency_modes(seq_len_q, modes=modes, mode_select_method=mode_select_method)
-        self.register_buffer("index_q", torch.tensor(self.index_q_, dtype=torch.int16))
+        self.register_buffer("index_q", torch.tensor(self.index_q_, dtype=torch.long))
         self.index_kv_ = get_frequency_modes(seq_len_kv, modes=modes, mode_select_method=mode_select_method)
-        self.register_buffer("index_kv", torch.tensor(self.index_kv_, dtype=torch.int16))
+        self.register_buffer("index_kv", torch.tensor(self.index_kv_, dtype=torch.long))
 
         print('modes_q={}, index_q={}'.format(len(self.index_q_), self.index_q_))
         print('modes_kv={}, index_kv={}'.format(len(self.index_kv_), self.index_kv_))
