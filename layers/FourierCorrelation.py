@@ -34,10 +34,13 @@ class FourierBlock(nn.Module):
         it does FFT, linear transform, and Inverse FFT.    
         """
         # get modes on frequency domain
-        self.index = get_frequency_modes(seq_len, modes=modes, mode_select_method=mode_select_method)
-        print('modes={}, index={}'.format(modes, self.index))
+        self.index_ = get_frequency_modes(seq_len, modes=modes, mode_select_method=mode_select_method)
+        print('modes={}, index={}'.format(modes, self.index_))
+        self.register_buffer("index", torch.tensor(self.index_, dtype=torch.int16))
 
-        self.scale = (1 / (in_channels * out_channels))
+        self.scale_ = (1 / (in_channels * out_channels))
+        self.register_buffer("scale", torch.tensor(self.scale_, dtype=torch.float32))
+
         # self.weights1 = nn.Parameter(
         #     self.scale * torch.rand(8, in_channels // 8, out_channels // 8, len(self.index), dtype=torch.cfloat))
         # redo using simple floats, because NCCL Backend does not support ComplexFloat data type
@@ -82,11 +85,13 @@ class FourierCrossAttention(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
         # get modes for queries and keys (& values) on frequency domain
-        self.index_q = get_frequency_modes(seq_len_q, modes=modes, mode_select_method=mode_select_method)
-        self.index_kv = get_frequency_modes(seq_len_kv, modes=modes, mode_select_method=mode_select_method)
+        self.index_q_ = get_frequency_modes(seq_len_q, modes=modes, mode_select_method=mode_select_method)
+        self.register_buffer("index_q", torch.tensor(self.index_q_, dtype=torch.int16))
+        self.index_kv_ = get_frequency_modes(seq_len_kv, modes=modes, mode_select_method=mode_select_method)
+        self.register_buffer("index_kv", torch.tensor(self.index_kv_, dtype=torch.int16))
 
-        print('modes_q={}, index_q={}'.format(len(self.index_q), self.index_q))
-        print('modes_kv={}, index_kv={}'.format(len(self.index_kv), self.index_kv))
+        print('modes_q={}, index_q={}'.format(len(self.index_q_), self.index_q_))
+        print('modes_kv={}, index_kv={}'.format(len(self.index_kv_), self.index_kv_))
 
         self.scale = (1 / (in_channels * out_channels))
         # self.weights1 = nn.Parameter(
