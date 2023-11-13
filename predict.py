@@ -48,9 +48,9 @@ class Configs(object):
     data_path = cmd_args.data_path
     csv_path = cmd_args.csv_path
 
-    seq_len = 32
-    label_len = 16
-    pred_len = 8
+    seq_len = 256
+    label_len = 128
+    pred_len = 256
 
     enc_in = 8
     dec_in = 8
@@ -60,13 +60,13 @@ class Configs(object):
     e_layers = 2
     d_layers = 1
     d_ff = 2048
-    moving_avg = 6
-    dropout = 0.05
+    moving_avg = 48
+    dropout = 0.2
     activation = 'gelu'
     output_attention = False
 
     # embed = 'timeF'
-    embed = 'token_only'
+    # embed = 'token_only'
     embed = cmd_args.embed
     # freq = 'h'
     # factor = 1
@@ -100,6 +100,9 @@ fedformer = FEDformer.LitFEDformer(args).to(device)
 fedformer.load_state_dict(checkpoint['state_dict'])
 # disable randomness, dropout, etc...
 fedformer.eval()
+print()
+print(fedformer.model.encoder.attn_layers[0].attention.inner_correlation.index)
+print()
 
 # %%
 # load a pretrained RAVE model via torch.script
