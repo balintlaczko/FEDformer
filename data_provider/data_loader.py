@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import torch
 from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from utils.timefeatures import time_features
 import warnings
 import h5py
@@ -573,10 +573,13 @@ class Dataset_RAVEnc(Dataset):
             chunk = self.get_chunk_from_memory(dataset_index, start_frame)
         # reshape from BCT to BTC
         chunk = chunk.transpose(1, 2)
+        # print()
+        # print("before scaling:", chunk.shape, chunk.min(), chunk.max())
         # scale the chunk if needed
         if self.scale:
             chunk = self.scaler.transform(chunk.squeeze(0).numpy())
             chunk = torch.from_numpy(chunk).unsqueeze(0)
+            # print("after scaling:", chunk.shape, chunk.min(), chunk.max())
         # quantize the chunk if needed
         if self.quantize:
             if self.quantizer_type == "kmeans":
@@ -584,9 +587,10 @@ class Dataset_RAVEnc(Dataset):
                 chunk = self.quantizer.centroids.transpose(0, 1)[quantizer_labels].unsqueeze(0)
             elif self.quantizer_type == "msprior":
                 chunk = self.quantizer(chunk, resolution=self.num_clusters)
+                # print("after quantizing:", chunk.shape, chunk.min(), chunk.max())
         # extract the input and output sequences
         seq_x, seq_y = self.get_x_y(chunk) # now returns BTC
-
+        # print()
         return seq_x.squeeze(0), seq_y.squeeze(0)  # as TC
 
     def __len__(self):
@@ -610,7 +614,15 @@ class Dataset_RAVEnc(Dataset):
         x = x / 2
         x = .5 * (1 + torch.erf(x / math.sqrt(2)))
         x = torch.floor(x * (resolution - 1))
-        x = x / (resolution - 1) - 0.5 # but this is me scaling it into [-0.5, 0.5]
+        x = x / (resolution - 1) * 2 - 1 # but this is me scaling it into the range [-1, 1]
+        return x
+
+    def inverse_msprior_quantizer(self, x, resolution=64):
+        x = (x + 1) / 2 * (resolution - 1) 
+        x = x / (resolution - 1)
+        x = x * 2 - 1
+        x = math.sqrt(2) * torch.erfinv(x)
+        x = x * 2
         return x
 
     def fit_scaler(self) -> None:
@@ -623,7 +635,8 @@ class Dataset_RAVEnc(Dataset):
             if self.quantizer_type == "kmeans":
                 self.quantizer = self.quantizer.cpu()
             return
-        self.scaler = StandardScaler()
+        # self.scaler = StandardScaler()
+        self.scaler = MinMaxScaler(feature_range=(-1, 1))
         # get progress bar from chunks dataset
         pbar = tqdm.tqdm(self.whole_file_embeddings)
         pbar.set_description("fitting standard scaler")
@@ -642,23 +655,34 @@ class Dataset_RAVEnc(Dataset):
 
         # fit quantizer
         if self.quantize:
-            if not self.quantizer_is_fit:
+            if not self.quantizer_is_fit and self.quantizer_type == "kmeans":
                 print("fitting quantizer...")
                 cluster_ids_x = self.quantizer.fit(all_embeddings.cuda().transpose(0, 1).contiguous())
                 print("quantizer fitted")
             else:
                 print("quantizer is already fitted")
-            self.quantizer = self.quantizer.cpu()
+            if self.quantizer_type == "kmeans":
+                self.quantizer = self.quantizer.cpu()
 
 
     def inverse_transform(self, data):
         # inverse transform the data with a scaler fit to the chunks ds
         if self.scaler == None:
             self.fit_scaler()
+        # first undo the quantization
+        # print("before inversion:", data.shape, data.min(), data.max())
+        if self.quantize and self.quantizer_type == "msprior":
+            # print("inverse quantizing...")
+            data = self.inverse_msprior_quantizer(data, resolution=self.num_clusters)
+            # print("unquantized:", data.shape, data.min(), data.max())
         # scale without the batch dimension
-        it = self.scaler.inverse_transform(data.squeeze(0).numpy())
+        if self.scale:
+            # print("inverse scaling...")
+            data = self.scaler.inverse_transform(data.squeeze(0).numpy())
+            data = torch.from_numpy(data).unsqueeze(0)
+            # print("unscaled:", data.shape, data.min(), data.max())
         # return with the batch dimension
-        return torch.from_numpy(it).unsqueeze(0)
+        return data
 
     def load_all_in_memory(self) -> None:
         """

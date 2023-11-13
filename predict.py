@@ -126,6 +126,7 @@ for generation_id in progress_bar:
     generated_length = cmd_args.num_steps
     num_generations = generated_length // args.pred_len
     # get the batch
+    x_original, y_original = test_dataset[id]
     x, y = test_dataset[id]
     x = x.unsqueeze(0).to(device) # (1, seq_len, 8)
     y = y.unsqueeze(0).to(device) # (1, label_len + pred_len, 8)
@@ -152,9 +153,8 @@ for generation_id in progress_bar:
 
     # %%
     # use the train set scaler to inverse transform the generated predictions
-    generated = generated.squeeze(0).cpu().numpy()
-    generated = test_dataset.scaler.inverse_transform(generated)
-    generated = torch.from_numpy(generated).unsqueeze(0).to(device)
+    generated = test_dataset.inverse_transform(generated.cpu())
+    generated = generated.to(device)
 
     # %%
     # decode the generated predictions
@@ -166,8 +166,8 @@ for generation_id in progress_bar:
         # reshape generated to (1, 8, generated_length) and decode
         decoded = rave_model.decode(generated.transpose(1, 2))
         # sanity check with inputs
-        # x = train_set.scaler.inverse_transform(x.squeeze(0).cpu().numpy())
-        # x = torch.from_numpy(x).unsqueeze(0).to(device)
+        # x = test_dataset.inverse_transform(x_original.cpu())
+        # x = x.to(device)
         # decoded = rave_model.decode(x.transpose(1, 2))
 
     # %%

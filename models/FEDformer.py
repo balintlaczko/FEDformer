@@ -8,7 +8,7 @@ from layers.SelfAttention_Family import FullAttention, ProbAttention
 from layers.MultiWaveletCorrelation import MultiWaveletCross, MultiWaveletTransform
 from layers.FourierCorrelation import FourierBlock, FourierCrossAttention
 from layers.AutoCorrelation import AutoCorrelation, AutoCorrelationLayer
-from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding, DataEmbedding_onlypos, SteppedTokenEmbedding, DataEmbedding_wo_pos_2
+from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding, DataEmbedding_onlypos, SteppedTokenEmbedding, DataEmbedding_wo_pos_2, PositionalEmbedding
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -270,13 +270,14 @@ class Model_noif(nn.Module):
         # Embedding
         # The series-wise connection inherently contains the sequential information.
         # Thus, we can discard the position embedding of transformers.
-        # d_model = 512
-        # we use "token_only" for RAVE embeddings datasets
         if self.embed == 'token_only':
             self.enc_embedding = TokenEmbedding(
                 configs.enc_in, configs.d_model)
             self.dec_embedding = TokenEmbedding(
                 configs.dec_in, configs.d_model)
+        elif self.embed == 'pos_only':
+            self.enc_embedding = PositionalEmbedding(configs.d_model)
+            self.dec_embedding = PositionalEmbedding(configs.d_model)
         elif self.embed == 'token_pos':
             self.enc_embedding = DataEmbedding_onlypos(
                 configs.enc_in, configs.d_model)

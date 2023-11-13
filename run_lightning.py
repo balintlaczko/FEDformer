@@ -140,7 +140,7 @@ def main():
     parser.add_argument('--comment', type=str, default='', help='add a comment if needed')
 
     args = parser.parse_args()
-    args.quantize = True
+    # args.quantize = True
 
     print('Args in experiment:')
     print(args)
