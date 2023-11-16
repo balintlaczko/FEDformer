@@ -494,7 +494,7 @@ class Dataset_RAVEnc(Dataset):
         # parse scaler
         self.scaler_is_fit = False
         # if the argument is a string, load the pickled scaler from file
-        if type(scaler) == str:
+        if type(scaler) == str and scaler_type == "minmax":
             self.scaler = load(open(scaler, 'rb'))
         else:
             self.scaler = scaler
