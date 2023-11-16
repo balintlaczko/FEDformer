@@ -456,10 +456,11 @@ class Dataset_RAVEnc(Dataset):
         size=None,  # [seq_len, label_len, pred_len]
         scale=True,
         scaler=None,
+        scaler_type="minmax", # or "global"
         quantize=False,
         num_clusters=64,
         quantizer=None,
-        quantizer_type="kmeans",
+        quantizer_type="msprior",
         all_in_memory=True,
         train_set=None,
     ) -> None:
@@ -487,6 +488,7 @@ class Dataset_RAVEnc(Dataset):
 
         # parse options
         self.scale = scale
+        self.scaler_type = scaler_type
         self.all_in_memory = all_in_memory
 
         # parse scaler
@@ -538,6 +540,10 @@ class Dataset_RAVEnc(Dataset):
         self.df = pd.read_csv(os.path.join(self.root_path, self.csv_path))
         # filter for the set we want (train/val/test)
         self.df = self.df[self.df.dataset == self.flag]
+        # TODO: filter for the speaker we want, this is just a test
+        # filter for subject_id "p239" in VCTK dataset
+        if self.csv_path.lower().startswith("vctk"):
+            self.df = self.df[self.df.subject_id == "p239"]
 
         # load all embeddings in memory if needed
         # and generate the chunk dataset
@@ -577,8 +583,13 @@ class Dataset_RAVEnc(Dataset):
         # print("before scaling:", chunk.shape, chunk.min(), chunk.max())
         # scale the chunk if needed
         if self.scale:
-            chunk = self.scaler.transform(chunk.squeeze(0).numpy())
-            chunk = torch.from_numpy(chunk).unsqueeze(0)
+            if self.scaler_type == "minmax":
+                chunk = self.scaler.transform(chunk.squeeze(0).numpy())
+                chunk = torch.from_numpy(chunk).unsqueeze(0)
+            elif self.scaler_type == "global":
+                chunk = self.scale_to_global_minmax(chunk)
+            else:
+                raise NotImplementedError("scaler type not implemented")
             # print("after scaling:", chunk.shape, chunk.min(), chunk.max())
         # quantize the chunk if needed
         if self.quantize:
@@ -664,6 +675,26 @@ class Dataset_RAVEnc(Dataset):
             if self.quantizer_type == "kmeans":
                 self.quantizer = self.quantizer.cpu()
 
+    def scale_to_global_minmax(self, data):
+        """
+        Scale the data to the global min and max of the dataset.
+        """
+        # scale the data to the range of [0, 1]
+        data = (data - self.global_min) / (self.global_max - self.global_min)
+        # scale to the range of [-1, 1]
+        data = data * 2 - 1
+        return data
+    
+    def unscale_from_global_minmax(self, data):
+        """
+        Unscale the data from the global min and max of the dataset.
+        """
+        # scale from the range of [-1, 1]
+        data = (data + 1) / 2
+        # scale from the range of [0, 1]
+        data = data * (self.global_max - self.global_min) + self.global_min
+        return data
+
 
     def inverse_transform(self, data):
         # inverse transform the data with a scaler fit to the chunks ds
@@ -678,8 +709,13 @@ class Dataset_RAVEnc(Dataset):
         # scale without the batch dimension
         if self.scale:
             # print("inverse scaling...")
-            data = self.scaler.inverse_transform(data.squeeze(0).numpy())
-            data = torch.from_numpy(data).unsqueeze(0)
+            if self.scaler_type == "minmax":
+                data = self.scaler.inverse_transform(data.squeeze(0).numpy())
+                data = torch.from_numpy(data).unsqueeze(0)
+            elif self.scaler_type == "global":
+                data = self.unscale_from_global_minmax(data)
+            else:
+                raise NotImplementedError("scaler type not implemented")
             # print("unscaled:", data.shape, data.min(), data.max())
         # return with the batch dimension
         return data
@@ -690,6 +726,8 @@ class Dataset_RAVEnc(Dataset):
         """
         # guard clause to avoid loading the embeddings twice
         if self.whole_file_embeddings != None:
+            self.global_min = torch.cat(self.whole_file_embeddings, dim=-1).min()
+            self.global_max = torch.cat(self.whole_file_embeddings, dim=-1).max()
             return
         self.whole_file_embeddings = []
         with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as f:
@@ -699,6 +737,10 @@ class Dataset_RAVEnc(Dataset):
             for i in pbar:
                 self.whole_file_embeddings.append(
                     torch.from_numpy(f[str(int(i))][()]))
+                
+        # set the global min and max
+        self.global_min = torch.cat(self.whole_file_embeddings, dim=-1).min()
+        self.global_max = torch.cat(self.whole_file_embeddings, dim=-1).max()
 
     def generate_chunk_dataset(self) -> None:
         """
