@@ -16,7 +16,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str, default='data/RAVE_encoded_datasets', help='root path of the data file')
 parser.add_argument('--data_path', type=str, default='vctk_trimmed_rave_encoded.h5', help='data file')
 parser.add_argument('--csv_path', type=str, default='vctk_trimmed_rave_encoded.csv', help='csv file')
+parser.add_argument('--version', type=str, default='Fourier', help='version of the model (Fourier or Wavelets)')
+parser.add_argument('--modes', type=int, default=64, help='number of modes to use for the Fourier layer')
+parser.add_argument('--pred_len', type=int, default=256, help='number of steps to predict')
 parser.add_argument('--scale', type=int, default=1, help='scale the data')
+parser.add_argument('--scaler_type', type=str, default='minmax', help='type of scaler to use (minmax or global)')
 parser.add_argument('--scaler_load_path', type=str, default='checkpoints/scaler.pt', help='path to where to load the fit scaler from')
 parser.add_argument('--quantize', type=int, default=1, help='quantize the data')
 parser.add_argument('--quantizer_type', type=str, default='msprior', help='type of quantizer to use (kmeans or msprior)')
@@ -37,9 +41,9 @@ cmd_args = parser.parse_args()
 # basic config
 class Configs(object):
     # ab = 0
-    # version = 'Fourier'
+    version = cmd_args.version
     mode_select = 'random'
-    modes = 64
+    modes = cmd_args.modes
     L = 3
     base = 'legendre'
     cross_activation = 'tanh'
@@ -50,7 +54,7 @@ class Configs(object):
 
     seq_len = 256
     label_len = 128
-    pred_len = 256
+    pred_len = cmd_args.pred_len
 
     enc_in = 8
     dec_in = 8
@@ -60,7 +64,7 @@ class Configs(object):
     e_layers = 2
     d_layers = 1
     d_ff = 2048
-    moving_avg = 48
+    moving_avg = 2
     dropout = 0.2
     activation = 'gelu'
     output_attention = False
@@ -76,6 +80,7 @@ class Configs(object):
     num_workers = 8
 
     scale = cmd_args.scale
+    scaler_type = cmd_args.scaler_type
     scaler_load_path = cmd_args.scaler_load_path
     quantize = cmd_args.quantize
     quantizer_type = cmd_args.quantizer_type
@@ -87,6 +92,12 @@ args = Configs()
 # %%
 # create data loaders for test set
 test_dataset, test_loader = data_provider_ravenc(args, "test", scaler=args.scaler_load_path, quantizer=args.quantizer_load_path)
+
+# in "global" scaling mode we need the global min and max from the train set
+if args.scaler_type == 'global':
+    train_dataset, train_loader = data_provider_ravenc(args, "train", scaler=args.scaler_load_path, quantizer=args.quantizer_load_path)
+    test_dataset.global_min = train_dataset.global_min
+    test_dataset.global_max = train_dataset.global_max
 
 # %%
 # torch device
@@ -101,7 +112,7 @@ fedformer.load_state_dict(checkpoint['state_dict'])
 # disable randomness, dropout, etc...
 fedformer.eval()
 print()
-print(fedformer.model.encoder.attn_layers[0].attention.inner_correlation.index)
+# print(fedformer.model.encoder.attn_layers[0].attention.inner_correlation.index)
 print()
 
 # %%
