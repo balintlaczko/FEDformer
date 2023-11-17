@@ -130,9 +130,14 @@ os.makedirs(output_folder, exist_ok=True)
 progress_bar = tqdm.tqdm(range(cmd_args.num_files))
 progress_bar.set_description(f"Generating {cmd_args.num_files} files")
 
+ids = np.arange(len(test_dataset))
+np.random.shuffle(ids)
+ids = ids[:cmd_args.num_files]
+
 for generation_id in progress_bar:
     # choose random id
-    id = np.random.randint(len(test_dataset))
+    # id = np.random.randint(len(test_dataset))
+    id = ids[generation_id]
     dataset_id, _ = test_dataset.chunk_dataset[id]
     generated_length = cmd_args.num_steps
     num_generations = generated_length // args.pred_len
