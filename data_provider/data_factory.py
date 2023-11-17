@@ -27,6 +27,7 @@ def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None
         flag=flag,
         size=[args.seq_len, args.label_len, args.pred_len],
         scale=scale_flag,
+        scaler_type=args.scaler_type,
         quantize=quantize_flag,
         quantizer_type=args.quantizer_type,
         num_clusters=args.quantizer_num_clusters,

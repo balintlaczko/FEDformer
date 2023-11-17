@@ -12,6 +12,7 @@ from layers.Embed import DataEmbedding, DataEmbedding_wo_pos, TokenEmbedding, Da
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+# import auraloss
 
 
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -23,7 +24,18 @@ class LitFEDformer(pl.LightningModule):
         self.args = args
         self.model = Model_noif(self.args)
         self.loss = nn.MSELoss()
-        # self.automatic_optimization = False
+        # define the loss function
+        # self.spectral_loss = auraloss.freq.MultiResolutionSTFTLoss(
+        #     fft_sizes=[1024, 2048],
+        #     hop_sizes=[256, 512],
+        #     win_lengths=[1024, 2048],
+        #     scale="mel",
+        #     n_bins=128,
+        #     sample_rate=44100,
+        #     perceptual_weighting=True,
+        # )
+        # self.rave_model = torch.jit.load("rave_pretrained_models/VCTK.ts", map_location="cuda")
+        # self.rave_model.eval()
 
     def training_step(self, batch, batch_idx):
         batch_x, batch_y = batch
@@ -38,14 +50,24 @@ class LitFEDformer(pl.LightningModule):
             [batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float()
 
         outputs = self.model(batch_x, None, dec_inp, None)
+        # print(f'outputs.shape: {outputs.shape}')
+        # with torch.no_grad():
+        #     outputs_decoded = self.rave_model.decode(outputs.transpose(1, 2))
+        # print(f'outputs_decoded.shape: {outputs_decoded.shape}')
 
         batch_y = batch_y[:, -self.args.pred_len:, :]
+        # with torch.no_grad():
+        #     batch_y_decoded = self.rave_model.decode(batch_y.transpose(1, 2))
+        # print(f'batch_y_decoded.shape: {batch_y_decoded.shape}')
 
-        loss = self.loss(outputs, batch_y)
+        latent_loss = self.loss(outputs, batch_y)
+        # spectral_loss = self.spectral_loss(outputs_decoded, batch_y_decoded)
 
-        self.log('train_loss', loss, on_step=True, on_epoch=True)
+        self.log('train_loss', latent_loss, on_step=True, on_epoch=True)
+        # self.log('spectral_loss', spectral_loss, on_step=True, on_epoch=True)
 
-        return loss
+        # return latent_loss + spectral_loss
+        return latent_loss * 10000
     
     def validation_step(self, batch, batch_idx):
         batch_x, batch_y = batch
@@ -60,14 +82,21 @@ class LitFEDformer(pl.LightningModule):
             [batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float()
 
         outputs = self.model(batch_x, None, dec_inp, None)
+        # with torch.no_grad():
+        #     outputs_decoded = self.rave_model.decode(outputs.transpose(1, 2))
 
         batch_y = batch_y[:, -self.args.pred_len:, :]
+        # with torch.no_grad():
+        #     batch_y_decoded = self.rave_model.decode(batch_y.transpose(1, 2))
 
-        loss = self.loss(outputs, batch_y)
+        latent_loss = self.loss(outputs, batch_y)
+        # spectral_loss = self.spectral_loss(outputs_decoded, batch_y_decoded)
 
-        self.log('val_loss', loss, on_step=True, on_epoch=True)
+        self.log('val_loss', latent_loss, on_step=True, on_epoch=True)
+        # self.log('val_spectral_loss', spectral_loss, on_step=True, on_epoch=True)
 
-        return loss
+        # return latent_loss + spectral_loss
+        return latent_loss * 10000
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -253,7 +282,7 @@ class Model_noif(nn.Module):
 
     def __init__(self, configs):
         super(Model_noif, self).__init__()
-        # self.version = configs.version
+        self.version = configs.version
         self.mode_select = configs.mode_select
         self.modes = configs.modes
         self.seq_len = configs.seq_len
@@ -297,22 +326,36 @@ class Model_noif(nn.Module):
             raise NotImplementedError("Embedding type not implemented")
 
 
-        encoder_self_att = FourierBlock(in_channels=configs.d_model,
-                                        out_channels=configs.d_model,
-                                        seq_len=self.seq_len,
-                                        modes=configs.modes,
-                                        mode_select_method=configs.mode_select)
-        decoder_self_att = FourierBlock(in_channels=configs.d_model,
-                                        out_channels=configs.d_model,
-                                        seq_len=self.seq_len//2+self.pred_len,
-                                        modes=configs.modes,
-                                        mode_select_method=configs.mode_select)
-        decoder_cross_att = FourierCrossAttention(in_channels=configs.d_model,
-                                                    out_channels=configs.d_model,
-                                                    seq_len_q=self.seq_len//2+self.pred_len,
-                                                    seq_len_kv=self.seq_len,
-                                                    modes=configs.modes,
-                                                    mode_select_method=configs.mode_select)
+        if configs.version == 'Wavelets':
+            encoder_self_att = MultiWaveletTransform(
+                ich=configs.d_model, L=configs.L, base=configs.base)
+            decoder_self_att = MultiWaveletTransform(
+                ich=configs.d_model, L=configs.L, base=configs.base)
+            decoder_cross_att = MultiWaveletCross(in_channels=configs.d_model,
+                                                  out_channels=configs.d_model,
+                                                  seq_len_q=self.seq_len // 2 + self.pred_len,
+                                                  seq_len_kv=self.seq_len,
+                                                  modes=configs.modes,
+                                                  ich=configs.d_model,
+                                                  base=configs.base,
+                                                  activation=configs.cross_activation)
+        else:
+            encoder_self_att = FourierBlock(in_channels=configs.d_model,
+                                            out_channels=configs.d_model,
+                                            seq_len=self.seq_len,
+                                            modes=configs.modes,
+                                            mode_select_method=configs.mode_select)
+            decoder_self_att = FourierBlock(in_channels=configs.d_model,
+                                            out_channels=configs.d_model,
+                                            seq_len=self.seq_len//2+self.pred_len,
+                                            modes=configs.modes,
+                                            mode_select_method=configs.mode_select)
+            decoder_cross_att = FourierCrossAttention(in_channels=configs.d_model,
+                                                      out_channels=configs.d_model,
+                                                      seq_len_q=self.seq_len//2+self.pred_len,
+                                                      seq_len_kv=self.seq_len,
+                                                      modes=configs.modes,
+                                                      mode_select_method=configs.mode_select)
         # Encoder
         enc_modes = int(min(configs.modes, configs.seq_len//2))
         dec_modes = int(
@@ -385,9 +428,14 @@ class Model_noif(nn.Module):
         mean = torch.mean(x_enc, dim=1).unsqueeze(
             1).repeat(1, self.pred_len, 1)  # [B, T, C], t = pred_len
         # print(f'mean.shape: {mean.shape}')
+
         seasonal_init, trend_init = self.decomp(x_enc)  # [B, T, C], [B, T, C], t = seq_len
         # print(f'seasonal_init.shape: {seasonal_init.shape}')
         # print(f'trend_init.shape: {trend_init.shape}')
+
+        # hard-avoid decomp
+        # seasonal_init = x_enc
+        # trend_init = x_enc
         
         # decoder input
         # concatenate the last label_len values of the trend_init with the mean that is pred_len long
@@ -433,7 +481,7 @@ class Model_noif(nn.Module):
 if __name__ == '__main__':
     class Configs(object):
         # ab = 0
-        # version = 'Fourier'
+        version = 'Fourier'
         mode_select = 'random'
         modes = 64
         L = 3
