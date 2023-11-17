@@ -8,3 +8,5 @@ lightning_logs/
 logs/
 rave_pretrained_models/
 generated_audio/
+genes/
+logs.zip
