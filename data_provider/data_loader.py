@@ -494,12 +494,13 @@ class Dataset_RAVEnc(Dataset):
         # parse scaler
         self.scaler_is_fit = False
         # if the argument is a string, load the pickled scaler from file
-        if type(scaler) == str and scaler_type == "minmax":
-            self.scaler = load(open(scaler, 'rb'))
-        else:
-            self.scaler = scaler
-        if self.scaler != None:
-            self.scaler_is_fit = True
+        if self.scale:
+            if type(scaler) == str and scaler_type == "minmax":
+                self.scaler = load(open(scaler, 'rb'))
+            else:
+                self.scaler = scaler
+            if self.scaler != None:
+                self.scaler_is_fit = True
 
         # qunatizer
         self.quantize = quantize
@@ -645,6 +646,10 @@ class Dataset_RAVEnc(Dataset):
             print("scaler is already fitted")
             if self.quantizer_type == "kmeans":
                 self.quantizer = self.quantizer.cpu()
+            return
+        # guard clause if scaling is off
+        if not self.scale:
+            print("scaling is off")
             return
         # self.scaler = StandardScaler()
         self.scaler = MinMaxScaler(feature_range=(-1, 1))
