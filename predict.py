@@ -87,6 +87,8 @@ class Configs(object):
     quantizer_num_clusters = cmd_args.quantizer_num_clusters
     quantizer_load_path = cmd_args.quantizer_load_path
 
+    filter_vctk = True
+
 args = Configs()
 
 # %%
