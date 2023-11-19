@@ -90,14 +90,71 @@ class Configs(object):
 args = Configs()
 
 # %%
-# create data loaders for test set
-test_dataset, test_loader = data_provider_ravenc(args, "test", scaler=args.scaler_load_path, quantizer=args.quantizer_load_path)
+# basic config
+class Configs_debug(object):
+    # ab = 0
+    version = "Fourier"
+    mode_select = 'random'
+    modes = 64
+    L = 3
+    base = 'legendre'
+    cross_activation = 'tanh'
 
+    root_path = "data/RAVE_encoded_datasets"
+    data_path = "vctk_trimmed_rave_encoded_concat_subjects_chunked.h5"
+    csv_path = "vctk_trimmed_rave_encoded_concat_subjects_chunked.csv"
+
+    seq_len = 256
+    label_len = 128
+    pred_len = 4
+
+    enc_in = 8
+    dec_in = 8
+    c_out = 8
+    d_model = 512
+    n_heads = 8
+    e_layers = 2
+    d_layers = 1
+    d_ff = 2048
+    moving_avg = 2
+    dropout = 0.2
+    activation = 'gelu'
+    output_attention = False
+
+    # embed = 'timeF'
+    # embed = 'token_only'
+    embed = "token_pos"
+    # freq = 'h'
+    # factor = 1
+    # wavelet = 0
+
+    batch_size = 512
+    num_workers = 8
+
+    scale = 1
+    # scaler_type = "global"
+    scaler_type = "minmax"
+    scaler_load_path = None
+    quantize = 0
+    quantizer_type = "msprior"
+    quantizer_num_clusters = 64
+    quantizer_load_path = ""
+
+# args = Configs_debug()
+
+# %%
+# create data loaders for test set
+# train_dataset, train_loader = data_provider_ravenc(args, "train")
+test_dataset, test_loader = data_provider_ravenc(args, "test", scaler=args.scaler_load_path,)
+# %%
 # in "global" scaling mode we need the global min and max from the train set
 if args.scaler_type == 'global':
-    train_dataset, train_loader = data_provider_ravenc(args, "train", scaler=args.scaler_load_path, quantizer=args.quantizer_load_path)
+    train_dataset, train_loader = data_provider_ravenc(args, "train", scaler=args.scaler_load_path)
     test_dataset.global_min = train_dataset.global_min
     test_dataset.global_max = train_dataset.global_max
+    print(f"Global min: {test_dataset.global_min}")
+    print(f"Global max: {test_dataset.global_max}")
+
 
 # %%
 # torch device
@@ -169,8 +226,9 @@ for generation_id in progress_bar:
 
     # %%
     # use the train set scaler to inverse transform the generated predictions
-    generated = test_dataset.inverse_transform(generated.cpu())
-    generated = generated.to(device)
+    if args.scale == 1:
+        generated = test_dataset.inverse_transform(generated.cpu())
+        generated = generated.to(device)
 
     # %%
     # decode the generated predictions
