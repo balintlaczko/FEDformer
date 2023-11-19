@@ -9,7 +9,10 @@ from utils.timefeatures import time_features
 import warnings
 import h5py
 import tqdm
-from torchpq.clustering import KMeans
+try:
+    from torchpq.clustering import KMeans
+except:
+    pass
 from pickle import dump, load
 import math
 
@@ -456,13 +459,14 @@ class Dataset_RAVEnc(Dataset):
         size=None,  # [seq_len, label_len, pred_len]
         scale=True,
         scaler=None,
-        scaler_type="minmax", # or "global"
+        scaler_type="minmax",  # or "global"
         quantize=False,
         num_clusters=64,
         quantizer=None,
         quantizer_type="msprior",
         all_in_memory=True,
         train_set=None,
+        filter_vctk=False,
     ) -> None:
         super().__init__()
 
@@ -485,6 +489,7 @@ class Dataset_RAVEnc(Dataset):
         self.root_path = root_path
         self.data_path = data_path
         self.csv_path = csv_path
+        self.filter_vctk = filter_vctk
 
         # parse options
         self.scale = scale
@@ -510,9 +515,12 @@ class Dataset_RAVEnc(Dataset):
         if self.quantize:
             if self.quantizer_type == "kmeans":
                 if self.quantizer == None:
-                    self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
+                    # self.quantizer = KMeans(
+                    #     n_clusters=self.num_clusters, distance="euclidean")
+                    pass
                 elif type(quantizer) == str:
-                    self.quantizer = KMeans(n_clusters=self.num_clusters, distance="euclidean")
+                    # self.quantizer = KMeans(
+                    #     n_clusters=self.num_clusters, distance="euclidean")
                     self.quantizer.load_state_dict(torch.load(quantizer))
                     self.quantizer_is_fit = True
             elif self.quantizer_type == "msprior":
@@ -542,7 +550,8 @@ class Dataset_RAVEnc(Dataset):
         self.df = self.df[self.df.dataset == self.flag]
         # TODO: filter for the speaker we want, this is just a test
         # filter for subject_id "p239" in VCTK dataset
-        if self.csv_path.lower().startswith("vctk"):
+        if self.csv_path.lower().startswith("vctk") and self.filter_vctk:
+            print("filtering for subject_id p239")
             self.df = self.df[self.df.subject_id == "p239"]
 
         # load all embeddings in memory if needed
@@ -594,26 +603,28 @@ class Dataset_RAVEnc(Dataset):
         # quantize the chunk if needed
         if self.quantize:
             if self.quantizer_type == "kmeans":
-                quantizer_labels = self.quantizer.predict(chunk.transpose(1, 2).squeeze(0))
-                chunk = self.quantizer.centroids.transpose(0, 1)[quantizer_labels].unsqueeze(0)
+                quantizer_labels = self.quantizer.predict(
+                    chunk.transpose(1, 2).squeeze(0))
+                chunk = self.quantizer.centroids.transpose(
+                    0, 1)[quantizer_labels].unsqueeze(0)
             elif self.quantizer_type == "msprior":
                 chunk = self.quantizer(chunk, resolution=self.num_clusters)
                 # print("after quantizing:", chunk.shape, chunk.min(), chunk.max())
         # extract the input and output sequences
-        seq_x, seq_y = self.get_x_y(chunk) # now returns BTC
+        seq_x, seq_y = self.get_x_y(chunk)  # now returns BTC
         # print()
         return seq_x.squeeze(0), seq_y.squeeze(0)  # as TC
 
     def __len__(self):
         # return the number of chunks
         return self.chunk_dataset.shape[0]
-    
+
     def save_scaler(self, destination_path: str):
         """
         Save the (fit) standard scaler to a file.
         """
         dump(self.scaler, open(destination_path, 'wb'))
-    
+
     def save_quantizer(self, destination_path: str):
         """
         Save the (fit) K-means quantizer to a file.
@@ -625,11 +636,12 @@ class Dataset_RAVEnc(Dataset):
         x = x / 2
         x = .5 * (1 + torch.erf(x / math.sqrt(2)))
         x = torch.floor(x * (resolution - 1))
-        x = x / (resolution - 1) * 2 - 1 # but this is me scaling it into the range [-1, 1]
+        # but this is me scaling it into the range [-1, 1]
+        x = x / (resolution - 1) * 2 - 1
         return x
 
     def inverse_msprior_quantizer(self, x, resolution=64):
-        x = (x + 1) / 2 * (resolution - 1) 
+        x = (x + 1) / 2 * (resolution - 1)
         x = x / (resolution - 1)
         x = x * 2 - 1
         x = math.sqrt(2) * torch.erfinv(x)
@@ -651,16 +663,18 @@ class Dataset_RAVEnc(Dataset):
         # get progress bar from chunks dataset
         pbar = tqdm.tqdm(self.whole_file_embeddings)
         pbar.set_description("fitting standard scaler")
-        all_embeddings = torch.cat(self.whole_file_embeddings, dim=-1) # the embeddings are BCT
+        # the embeddings are BCT
+        all_embeddings = torch.cat(self.whole_file_embeddings, dim=-1)
         print("all embeddings shape: ", all_embeddings.shape)
         # channels last
-        all_embeddings = all_embeddings.transpose(1, 2) # BTC
+        all_embeddings = all_embeddings.transpose(1, 2)  # BTC
         print("all embeddings shape: ", all_embeddings.shape)
 
         # fit the scaler
         if self.scale:
             print("fitting scaler...")
-            all_embeddings = self.scaler.fit_transform(all_embeddings.squeeze(0).numpy())
+            all_embeddings = self.scaler.fit_transform(
+                all_embeddings.squeeze(0).numpy())
             print("scaler fitted")
             all_embeddings = torch.from_numpy(all_embeddings)
 
@@ -668,7 +682,8 @@ class Dataset_RAVEnc(Dataset):
         if self.quantize:
             if not self.quantizer_is_fit and self.quantizer_type == "kmeans":
                 print("fitting quantizer...")
-                cluster_ids_x = self.quantizer.fit(all_embeddings.cuda().transpose(0, 1).contiguous())
+                cluster_ids_x = self.quantizer.fit(
+                    all_embeddings.cuda().transpose(0, 1).contiguous())
                 print("quantizer fitted")
             else:
                 print("quantizer is already fitted")
@@ -684,7 +699,7 @@ class Dataset_RAVEnc(Dataset):
         # scale to the range of [-1, 1]
         data = data * 2 - 1
         return data
-    
+
     def unscale_from_global_minmax(self, data):
         """
         Unscale the data from the global min and max of the dataset.
@@ -695,7 +710,6 @@ class Dataset_RAVEnc(Dataset):
         data = data * (self.global_max - self.global_min) + self.global_min
         return data
 
-
     def inverse_transform(self, data):
         # inverse transform the data with a scaler fit to the chunks ds
         if self.scaler == None:
@@ -704,7 +718,8 @@ class Dataset_RAVEnc(Dataset):
         # print("before inversion:", data.shape, data.min(), data.max())
         if self.quantize and self.quantizer_type == "msprior":
             # print("inverse quantizing...")
-            data = self.inverse_msprior_quantizer(data, resolution=self.num_clusters)
+            data = self.inverse_msprior_quantizer(
+                data, resolution=self.num_clusters)
             # print("unquantized:", data.shape, data.min(), data.max())
         # scale without the batch dimension
         if self.scale:
@@ -726,8 +741,10 @@ class Dataset_RAVEnc(Dataset):
         """
         # guard clause to avoid loading the embeddings twice
         if self.whole_file_embeddings != None:
-            self.global_min = torch.cat(self.whole_file_embeddings, dim=-1).min()
-            self.global_max = torch.cat(self.whole_file_embeddings, dim=-1).max()
+            self.global_min = torch.cat(
+                self.whole_file_embeddings, dim=-1).min()
+            self.global_max = torch.cat(
+                self.whole_file_embeddings, dim=-1).max()
             return
         self.whole_file_embeddings = []
         with h5py.File(os.path.join(self.root_path, self.data_path), 'r') as f:
@@ -737,7 +754,7 @@ class Dataset_RAVEnc(Dataset):
             for i in pbar:
                 self.whole_file_embeddings.append(
                     torch.from_numpy(f[str(int(i))][()]))
-                
+
         # set the global min and max
         self.global_min = torch.cat(self.whole_file_embeddings, dim=-1).min()
         self.global_max = torch.cat(self.whole_file_embeddings, dim=-1).max()

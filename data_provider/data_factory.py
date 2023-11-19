@@ -10,6 +10,7 @@ data_dict = {
     'RAVEnc': Dataset_RAVEnc,
 }
 
+
 def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None):
     shuffle_flag = flag == 'train'
     drop_last = flag == 'train'
@@ -35,6 +36,7 @@ def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None
         scaler=scaler,
         quantizer=quantizer,
         train_set=train_set,
+        filter_vctk=args.filter_vctk,
     )
     print(flag, len(data_set))
     data_loader = DataLoader(
