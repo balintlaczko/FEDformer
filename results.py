@@ -87,7 +87,7 @@ model_a.eval()
 
 # %%
 # load model B
-model_b_ckpt_path = "checkpoints/model_hpc_vctk_p239_beefy/model_hpc_vctk_p239_beefy_last_epoch=452.ckpt"
+model_b_ckpt_path = "checkpoints/model_hpc_vctk_p239_beefy/model_hpc_vctk_p239_beefy_last_epoch=818.ckpt"
 checkpoint_b = torch.load(model_b_ckpt_path, map_location=device)
 model_b = FEDformer.LitFEDformer(args_b).to(device)
 model_b.load_state_dict(checkpoint_b['state_dict'])
@@ -425,41 +425,379 @@ frechet = FrechetAudioDistance(
 )
 
 # Specify the paths to your saved embeddings
-background_embds_path = "/data/FAD/test_bg_embeddings.npy"
-model_a_test_embds_path = "/data/FAD/model_a_test_embeddings.npy"
-model_a_norm_embds_path = "/data/FAD/model_a_norm_embeddings.npy"
-model_a_evo_embds_path = "/data/FAD/model_a_evo_embeddings.npy"
+background_embds_path = "data/FAD/test_bg_embeddings.npy"
+model_a_test_embds_path = "data/FAD/model_a_test_embeddings.npy"
+model_a_norm_embds_path = "data/FAD/model_a_norm_embeddings.npy"
+model_a_evo_embds_path = "data/FAD/model_a_evo_embeddings.npy"
 
-background_test_set_path = "/data/RAVE_decoded_datasets/test_ds_decoded"
-model_a_test_set_path = "/data/RAVE_decoded_datasets/model_a_pred_cond_test"
-model_a_norm_set_path = "/data/RAVE_decoded_datasets/model_a_pred_cond_norm"
-model_a_evo_set_path = "/data/RAVE_decoded_datasets/model_a_pred_cond_evo"
+background_test_set_path = "data/RAVE_decoded_datasets/test_ds_decoded"
+model_a_test_set_path = "data/RAVE_decoded_datasets/model_a_pred_cond_test"
+model_a_norm_set_path = "data/RAVE_decoded_datasets/model_a_pred_cond_norm"
+model_a_evo_set_path = "data/RAVE_decoded_datasets/model_a_pred_cond_evo"
 
 # %%
-# Compute FAD score while reusing the saved embeddings (or saving new ones if paths are provided and embeddings don't exist yet)
+# Compute FAD score for model A condition: TEST
 
+# Compute FAD score while reusing the saved embeddings (or saving new ones if paths are provided and embeddings don't exist yet)
 model_a_test_fad_score = frechet.score(
     background_test_set_path,
     model_a_test_set_path,
     background_embds_path=background_embds_path,
-    eval_embds_path=model_a_test_embds_path,
+    # eval_embds_path=model_a_test_embds_path,
     dtype="float32"
 )
+
+print("FAD score for model A condition: TEST")
+print(model_a_test_fad_score)
+
+# %%
+# Compute FAD score for model A condition: NORMAL
 
 model_a_norm_fad_score = frechet.score(
     background_test_set_path,
     model_a_norm_set_path,
     background_embds_path=background_embds_path,
-    eval_embds_path=model_a_norm_embds_path,
+    # eval_embds_path=model_a_norm_embds_path,
     dtype="float32"
 )
+
+print("FAD score for model A condition: NORMAL")
+print(model_a_norm_fad_score)
+
+# %%
+# Compute FAD score for model A condition: EVO
 
 model_a_evo_fad_score = frechet.score(
     background_test_set_path,
     model_a_evo_set_path,
     background_embds_path=background_embds_path,
-    eval_embds_path=model_a_evo_embds_path,
+    # eval_embds_path=model_a_evo_embds_path,
     dtype="float32"
 )
+
+print("FAD score for model A condition: EVO")
+print(model_a_evo_fad_score)
+
+
+# %%
+# ----------------------------
+# ----------------------------
+# ----------------------------
+# ----------------------------
+
+
+
+# %%
+# generate predictions; model B; condition: TEST
+
+model_b_pred_cond_test_dir = "data/RAVE_decoded_datasets/model_b_pred_cond_test"
+os.makedirs(model_b_pred_cond_test_dir, exist_ok=True)
+
+seq_len = args_b.seq_len  # 256
+label_len = args_b.label_len  # 128
+pred_len = args_b.pred_len  # 4
+files_to_generate = 500
+generated_length = 64
+num_generations = generated_length // pred_len  # 1
+
+# [8, 1] (same for both models)
+test_set_chunk_ids = test_dataset_b.df.dataset_index.values
+
+for file_id in tqdm.tqdm(range(files_to_generate)):
+    # alternate between using the two test chunks (8 or 1)
+    if file_id % 2 == 0:
+        ind = test_set_chunk_ids[0]
+    else:
+        ind = test_set_chunk_ids[1]
+
+    # get data
+    x = test_dataset_b.whole_file_embeddings[ind].transpose(
+        1, 2).to(device)  # (1, 1905, 8)
+
+    # apply global scaling
+    # x = test_dataset_a.scale_to_global_minmax(x)  # (1, 1905, 8)
+
+    # NO SCALING FOR MODEL B
+
+    # get a random sequence of length seq_len
+    random_start = np.random.randint(0, x.shape[1] - seq_len)
+    x = x[:, random_start:random_start + seq_len, :]  # (1, seq_len, 8)
+
+    # create buffers for model forward pass
+    zeros4preds = torch.zeros_like(
+        x[:, -pred_len:, :]).float().to(device)  # (1, pred_len, 8)
+    y_labels = x[:, -label_len:, :].to(device)  # (1, label_len, 8)
+
+    # autoregressive loop
+    generated = []
+    with torch.no_grad():
+        for i in range(num_generations):
+            # create a new decoder input
+            # (1, label_len + pred_len, 8)
+            dec_inp = torch.cat([y_labels, zeros4preds], dim=1).float()
+            # get model predictions
+            model_preds = model_b.model(
+                x, None, dec_inp, None)  # (1, pred_len, 8)
+            # append the predictions to the generated list
+            generated.append(model_preds)
+            # shift x by pred_len and append the predictions
+            x = torch.cat([x[:, pred_len:, :], model_preds],
+                          dim=1)  # (1, seq_len, 8)
+            y_labels = x[:, -label_len:, :]  # (1, label_len, 8)
+
+    # concatenate all the generated predictions
+    generated = torch.cat(generated, dim=1)  # (1, generated_length, 8)
+
+    # use the global min/max to inverse transform the generated predictions
+    # generated = test_dataset_a.unscale_from_global_minmax(generated)
+
+    # NO SCALING FOR MODEL B
+
+    # reload rave model
+    rave_model = torch.jit.load(rave_model_path, map_location=device)
+    rave_model.eval()
+
+    # decode
+    with torch.no_grad():
+        decoded = rave_model.decode(generated.transpose(1, 2))
+
+    # save
+    buffer = decoded.transpose(1, 2).squeeze(0).cpu().numpy()
+    output_file_name = f"model_b_pred_cond_test_{file_id}.wav"
+    sf.write(os.path.join(model_b_pred_cond_test_dir,
+             output_file_name), buffer, 44100)
+
+
+# %%
+# concatenate test set, measure mean and std vectors
+# [8, 1] (same for both models)
+test_set_chunk_ids = test_dataset_b.df.dataset_index.values
+test_embeddings = [test_dataset_b.whole_file_embeddings[ind]
+                   for ind in test_set_chunk_ids]
+test_embeddings = torch.cat(test_embeddings, dim=-1)  # (1, 8, 4133)
+# channels last
+test_embeddings = test_embeddings.transpose(1, 2)  # BTC: (1, 4133, 8)
+test_dataset_b_mean = test_embeddings.mean(dim=1).squeeze(0)  # (8,)
+test_dataset_b_std = test_embeddings.std(dim=1).squeeze(0)  # (8,)
+print("test_dataset_b_mean:", test_dataset_b_mean)
+print("test_dataset_b_std:", test_dataset_b_std)
+# create a distribution from the mean and std vectors
+test_dataset_b_dist = torch.distributions.normal.Normal(
+    test_dataset_b_mean, test_dataset_b_std)
+# sample from the distribution
+sample = test_dataset_b_dist.sample((1, 256))
+print("sample shape: ", sample.shape)
+
+# %%
+# generate predictions; model B; condition: NORMAL
+
+
+model_b_pred_cond_norm_dir = "data/RAVE_decoded_datasets/model_b_pred_cond_norm"
+os.makedirs(model_b_pred_cond_norm_dir, exist_ok=True)
+
+seq_len = args_b.seq_len  # 256
+label_len = args_b.label_len  # 128
+pred_len = args_b.pred_len  # 4
+files_to_generate = 500
+generated_length = 64
+num_generations = generated_length // pred_len  # 1
+
+# [8, 1] (same for both models)
+test_set_chunk_ids = test_dataset_b.df.dataset_index.values
+
+
+for file_id in tqdm.tqdm(range(files_to_generate)):
+    # sample from the normal distribution
+    x = test_dataset_b_dist.sample((1, seq_len)).to(device)
+
+    # apply global scaling
+    # x = test_dataset_a.scale_to_global_minmax(x)  # (1, seq_len, 8)
+
+    # NO SCALING FOR MODEL B
+
+    # create buffers for model forward pass
+    zeros4preds = torch.zeros_like(
+        x[:, -pred_len:, :]).float().to(device)  # (1, pred_len, 8)
+    y_labels = x[:, -label_len:, :].to(device)  # (1, label_len, 8)
+
+    # autoregressive loop
+    generated = []
+    with torch.no_grad():
+        for i in range(num_generations):
+            # create a new decoder input
+            # (1, label_len + pred_len, 8)
+            dec_inp = torch.cat([y_labels, zeros4preds], dim=1).float()
+            # get model predictions
+            model_preds = model_b.model(
+                x, None, dec_inp, None)  # (1, pred_len, 8)
+            # append the predictions to the generated list
+            generated.append(model_preds)
+            # shift x by pred_len and append the predictions
+            x = torch.cat([x[:, pred_len:, :], model_preds],
+                          dim=1)  # (1, seq_len, 8)
+            y_labels = x[:, -label_len:, :]  # (1, label_len, 8)
+
+    # concatenate all the generated predictions
+    generated = torch.cat(generated, dim=1)  # (1, generated_length, 8)
+
+    # use the global min/max to inverse transform the generated predictions
+    # generated = test_dataset_a.unscale_from_global_minmax(generated)
+
+    # NO SCALING FOR MODEL B
+
+    # reload rave model
+    rave_model = torch.jit.load(rave_model_path, map_location=device)
+    rave_model.eval()
+
+    # decode
+    with torch.no_grad():
+        decoded = rave_model.decode(generated.transpose(1, 2))
+
+    # save
+    buffer = decoded.transpose(1, 2).squeeze(0).cpu().numpy()
+    output_file_name = f"model_b_pred_cond_norm_{file_id}.wav"
+    sf.write(os.path.join(model_b_pred_cond_norm_dir,
+             output_file_name), buffer, 44100)
+
+
+# %%
+# generate predictions; model B; condition: EVO
+
+
+model_b_pred_cond_evo_dir = "data/RAVE_decoded_datasets/model_b_pred_cond_evo"
+os.makedirs(model_b_pred_cond_evo_dir, exist_ok=True)
+
+evo_initials_encoded = np.load("genes/genes.npy")  # (500, 8, 64)
+
+seq_len = args_b.seq_len  # 256
+label_len = args_b.label_len  # 128
+pred_len = args_b.pred_len  # 4
+generated_length = 64
+num_generations = generated_length // pred_len  # 1
+
+
+for ind in tqdm.tqdm(range(evo_initials_encoded.shape[0])):
+    # get data
+    x = torch.from_numpy(evo_initials_encoded[ind]).unsqueeze(
+        0).transpose(1, 2).float().to(device)  # (1, 64, 8)
+    # repeat 4 times to get a sequence of length 256
+    x = x.repeat(1, 4, 1)  # (1, 256, 8)
+
+    # apply global scaling
+    # x = test_dataset_a.scale_to_global_minmax(x)  # (1, seq_len, 8)
+
+    # NO SCALING FOR MODEL B
+
+    # create buffers for model forward pass
+    zeros4preds = torch.zeros_like(
+        x[:, -pred_len:, :]).float().to(device)  # (1, pred_len, 8)
+    y_labels = x[:, -label_len:, :].to(device)  # (1, label_len, 8)
+
+    # autoregressive loop
+    generated = []
+    with torch.no_grad():
+        for i in range(num_generations):
+            # create a new decoder input
+            # (1, label_len + pred_len, 8)
+            dec_inp = torch.cat([y_labels, zeros4preds], dim=1).float()
+            # get model predictions
+            model_preds = model_b.model(
+                x, None, dec_inp, None)  # (1, pred_len, 8)
+            # append the predictions to the generated list
+            generated.append(model_preds)
+            # shift x by pred_len and append the predictions
+            x = torch.cat([x[:, pred_len:, :], model_preds],
+                          dim=1)  # (1, seq_len, 8)
+            y_labels = x[:, -label_len:, :]  # (1, label_len, 8)
+
+    # concatenate all the generated predictions
+    generated = torch.cat(generated, dim=1)  # (1, generated_length, 8)
+
+    # use the global min/max to inverse transform the generated predictions
+    # generated = test_dataset_a.unscale_from_global_minmax(generated)
+
+    # NO SCALING FOR MODEL B
+
+    # reload rave model
+    rave_model = torch.jit.load(rave_model_path, map_location=device)
+    rave_model.eval()
+
+    # decode
+    with torch.no_grad():
+        decoded = rave_model.decode(generated.transpose(1, 2))
+
+    # save
+    buffer = decoded.transpose(1, 2).squeeze(0).cpu().numpy()
+    output_file_name = f"model_b_pred_cond_evo_{ind}.wav"
+    sf.write(os.path.join(model_b_pred_cond_evo_dir,
+             output_file_name), buffer, 44100)
+
+
+# %%
+# generate FAD scores for model B predictions
+
+# to use `vggish`
+frechet = FrechetAudioDistance(
+    ckpt_dir="./checkpoints/vggish",
+    model_name="vggish",
+    sample_rate=16000,
+    use_pca=False,
+    use_activation=False,
+    verbose=False
+)
+
+# Specify the paths to your saved embeddings
+background_embds_path = "data/FAD/test_bg_embeddings.npy"
+model_b_test_embds_path = "data/FAD/model_b_test_embeddings.npy"
+model_b_norm_embds_path = "data/FAD/model_b_norm_embeddings.npy"
+model_b_evo_embds_path = "data/FAD/model_b_evo_embeddings.npy"
+
+background_test_set_path = "data/RAVE_decoded_datasets/test_ds_decoded"
+model_b_test_set_path = "data/RAVE_decoded_datasets/model_b_pred_cond_test"
+model_b_norm_set_path = "data/RAVE_decoded_datasets/model_b_pred_cond_norm"
+model_b_evo_set_path = "data/RAVE_decoded_datasets/model_b_pred_cond_evo"
+
+# %%
+# Compute FAD score for model A condition: TEST
+
+# Compute FAD score while reusing the saved embeddings (or saving new ones if paths are provided and embeddings don't exist yet)
+model_b_test_fad_score = frechet.score(
+    background_test_set_path,
+    model_b_test_set_path,
+    background_embds_path=background_embds_path,
+    # eval_embds_path=model_b_test_embds_path,
+    dtype="float32"
+)
+
+print("FAD score for model B condition: TEST")
+print(model_b_test_fad_score)
+
+# %%
+# Compute FAD score for model A condition: NORMAL
+
+model_b_norm_fad_score = frechet.score(
+    background_test_set_path,
+    model_b_norm_set_path,
+    background_embds_path=background_embds_path,
+    # eval_embds_path=model_b_norm_embds_path,
+    dtype="float32"
+)
+
+print("FAD score for model B condition: NORMAL")
+print(model_b_norm_fad_score)
+
+# %%
+# Compute FAD score for model A condition: EVO
+
+model_b_evo_fad_score = frechet.score(
+    background_test_set_path,
+    model_b_evo_set_path,
+    background_embds_path=background_embds_path,
+    # eval_embds_path=model_b_evo_embds_path,
+    dtype="float32"
+)
+
+print("FAD score for model B condition: EVO")
+print(model_b_evo_fad_score)
 
 # %%
