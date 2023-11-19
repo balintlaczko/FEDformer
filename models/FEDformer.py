@@ -67,7 +67,8 @@ class LitFEDformer(pl.LightningModule):
         # self.log('spectral_loss', spectral_loss, on_step=True, on_epoch=True)
 
         # return latent_loss + spectral_loss
-        return latent_loss * 10000
+        # return latent_loss * 10000
+        return latent_loss
     
     def validation_step(self, batch, batch_idx):
         batch_x, batch_y = batch
@@ -96,7 +97,8 @@ class LitFEDformer(pl.LightningModule):
         # self.log('val_spectral_loss', spectral_loss, on_step=True, on_epoch=True)
 
         # return latent_loss + spectral_loss
-        return latent_loss * 10000
+        # return latent_loss * 10000
+        return latent_loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(

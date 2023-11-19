@@ -148,7 +148,10 @@ def main():
 
     # create data loaders for train and val
     train_set, train_loader = data_provider_ravenc(args, "train", scaler=args.scaler_load_path, quantizer=args.quantizer_load_path)
-    _, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, quantizer=train_set.quantizer, train_set=train_set)
+    if train_set.scale:
+        _, val_loader = data_provider_ravenc(args, "val", scaler=train_set.scaler, quantizer=train_set.quantizer, train_set=train_set)
+    else:
+        _, val_loader = data_provider_ravenc(args, "val", train_set=train_set)
 
     fedformer = FEDformer.LitFEDformer(args)
 
