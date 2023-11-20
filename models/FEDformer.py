@@ -101,7 +101,7 @@ class LitFEDformer(pl.LightningModule):
         return latent_loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(
+        optimizer = torch.optim.AdamW(
             self.model.parameters(), lr=self.args.learning_rate)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, gamma=0.999)
