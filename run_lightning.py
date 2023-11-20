@@ -92,11 +92,13 @@ def main():
     # data scaling and quantization
     parser.add_argument('--scale', type=int, default=1, help='whether to scale data')
     parser.add_argument('--scaler_type', type=str, default='minmax', help='type of scaler to use. can be minmax or global')
-    parser.add_argument('--scaler_load_path', type=str, default='checkpoints/scaler.pkl', help='path to where to load the fit scaler from')
+    parser.add_argument('--scaler_load_path', type=str, default=None, help='path to where to load the fit scaler from')
     parser.add_argument('--quantize', type=int, default=1, help='whether to quantize data')
     parser.add_argument('--quantizer_type', type=str, default='kmeans', help='type of quantizer to use')
     parser.add_argument('--quantizer_num_clusters', type=int, default=64, help='number of clusters for quantizer')
     parser.add_argument('--quantizer_load_path', type=str, default='checkpoints/quantizer.pt', help='path to where to load the fit k-means quantizer from')
+
+    parser.add_argument('--filter_vctk', type=int, default=1, help='whether to filter out vctk')
     # parser.add_argument('--factor', type=int, default=1, help='attn factor')
     # parser.add_argument('--distil', action='store_false',
     #                     help='whether to use distilling in encoder, using this argument means not using distilling',
