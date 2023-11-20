@@ -800,4 +800,133 @@ model_b_evo_fad_score = frechet.score(
 print("FAD score for model B condition: EVO")
 print(model_b_evo_fad_score)
 
+
+# %%
+# test number range stats of the train set vs test set
+
+t_train_dataset, _ = data_provider_ravenc(args_b, "train")
+t_test_dataset, _ = data_provider_ravenc(args_b, "test")
+
+# %%
+# get chunk ids from train and test sets
+t_train_ids = t_train_dataset.df.dataset_index.values
+t_test_ids = t_test_dataset.df.dataset_index.values
+
+# get chunks from train and test sets
+t_train_chunks = [t_train_dataset.whole_file_embeddings[ind]
+                  for ind in t_train_ids]
+t_train_chunks = torch.cat(t_train_chunks, dim=-1) # (1, 8, 11789)
+
+t_test_chunks = [t_test_dataset.whole_file_embeddings[ind]]
+t_test_chunks = torch.cat(t_test_chunks, dim=-1) # (1, 8, 1195)
+
+# %%
+t_train_chunks.min(), t_train_chunks.max()
+# %%
+t_test_chunks.min(), t_test_chunks.max()
+# %%
+t_train_chunks.mean(), t_train_chunks.std()
+# %%
+t_test_chunks.mean(), t_test_chunks.std()
+# %%
+t_train_chunks.median()
+# %%
+t_test_chunks.median()
+# %%
+# kld between train and test
+# repeat test chunks 9 times
+t_test_chunks_rep = t_test_chunks.repeat(1, 1, 9) # (1, 8, 10755)
+t_train_chunks_trim = t_train_chunks[..., :t_test_chunks_rep.shape[-1]] # (1, 8, 10755)
+all_chunks = torch.cat([t_test_chunks_rep, t_train_chunks_trim], dim=-1) # (1, 8, 21510)
+
+global_min = all_chunks.min()
+global_max = all_chunks.max()
+
+global_min, global_max
+
+# %%
+
+def scale_to_global_minmax(data, global_min, global_max):
+    """
+    Scale the data to the global min and max of the dataset.
+    """
+    # scale the data to the range of [0, 1]
+    data = (data - global_min) / (global_max - global_min)
+    return data
+
+def unscale_from_global_minmax(data):
+    """
+    Unscale the data from the global min and max of the dataset.
+    """
+    # scale from the range of [0, 1]
+    data = data * (global_max - global_min) + global_min
+    return data
+
+# %%
+t_test_chunks_rep_scaled = scale_to_global_minmax(t_test_chunks_rep, global_min, global_max)
+t_train_chunks_trim_scaled = scale_to_global_minmax(t_train_chunks_trim, global_min, global_max)
+
+# %%
+t_train_chunks_trim_scaled.min(), t_train_chunks_trim_scaled.max()
+
+# %%
+t_test_chunks_rep_scaled.min(), t_test_chunks_rep_scaled.max()
+
+# %%
+# reduce to 2D with PCA and plot the train and test sets
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+pca = PCA(n_components=2)
+
+# fit pca
+pca.fit(t_train_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+
+# transform train and test sets
+train_pca = pca.transform(t_train_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+test_pca = pca.transform(t_test_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+
+# plot
+plt.scatter(train_pca[:, 0], train_pca[:, 1], label="train")
+plt.scatter(test_pca[:, 0], test_pca[:, 1], label="test")
+
+plt.legend()
+plt.show()
+
+# %%
+# apply robust scaler to train and test sets
+from sklearn.preprocessing import RobustScaler
+scaler = RobustScaler()
+
+# fit scaler
+scaler.fit(t_train_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+
+# transform train and test sets
+train_scaled = scaler.transform(t_train_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+test_scaled = scaler.transform(t_test_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+
+# plot
+plt.scatter(train_scaled[:, 0], train_scaled[:, 1], label="train", s=2)
+plt.scatter(test_scaled[:, 0], test_scaled[:, 1], label="test", s=2)
+
+plt.legend()
+plt.show()
+
+# %%
+# apply standard scaler to train and test sets
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+
+# fit scaler
+scaler.fit(t_train_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+
+# transform train and test sets
+train_scaled = scaler.transform(t_train_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+test_scaled = scaler.transform(t_test_chunks.transpose(1, 2).squeeze(0).cpu().numpy())
+
+# plot
+plt.scatter(train_scaled[:, 0], train_scaled[:, 1], label="train", s=2)
+plt.scatter(test_scaled[:, 0], test_scaled[:, 1], label="test", s=2)
+
+plt.legend()
+plt.show()
 # %%
