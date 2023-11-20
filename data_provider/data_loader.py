@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import torch
 from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from utils.timefeatures import time_features
 import warnings
 import h5py
@@ -500,7 +500,7 @@ class Dataset_RAVEnc(Dataset):
         self.scaler_is_fit = False
         # if the argument is a string, load the pickled scaler from file
         if self.scale:
-            if type(scaler) == str and scaler_type == "minmax":
+            if type(scaler) == str and scaler_type in ["minmax", "standard", "robust"]:
                 self.scaler = load(open(scaler, 'rb'))
             else:
                 self.scaler = scaler
@@ -593,7 +593,7 @@ class Dataset_RAVEnc(Dataset):
         # print("before scaling:", chunk.shape, chunk.min(), chunk.max())
         # scale the chunk if needed
         if self.scale:
-            if self.scaler_type == "minmax":
+            if self.scaler_type in ["minmax", "standard", "robust"]:
                 chunk = self.scaler.transform(chunk.squeeze(0).numpy())
                 chunk = torch.from_numpy(chunk).unsqueeze(0)
             elif self.scaler_type == "global":
@@ -663,24 +663,34 @@ class Dataset_RAVEnc(Dataset):
         if not self.scale:
             print("scaling is off")
             return
-        # self.scaler = StandardScaler()
-        self.scaler = MinMaxScaler(feature_range=(-1, 1))
+        
+        # initialize the scaler
+        if self.scaler_type == "minmax":
+            self.scaler = MinMaxScaler(feature_range=(-1, 1))
+            print("using minmax scaler with feature range (-1, 1)")
+        elif self.scaler_type == "standard":
+            self.scaler = StandardScaler()
+            print("using standard scaler")
+        elif self.scaler_type == "robust":
+            self.scaler = RobustScaler()
+            print("using robust scaler")
+
         # get progress bar from chunks dataset
         pbar = tqdm.tqdm(self.whole_file_embeddings)
-        pbar.set_description("fitting standard scaler")
+        pbar.set_description(f"fitting {self.scaler_type} scaler")
         # the embeddings are BCT
         all_embeddings = torch.cat(self.whole_file_embeddings, dim=-1)
-        print("all embeddings shape: ", all_embeddings.shape)
+        # print("all embeddings shape: ", all_embeddings.shape)
         # channels last
         all_embeddings = all_embeddings.transpose(1, 2)  # BTC
-        print("all embeddings shape: ", all_embeddings.shape)
+        # print("all embeddings shape: ", all_embeddings.shape)
 
         # fit the scaler
         if self.scale:
-            print("fitting scaler...")
+            print(f"fitting {self.scaler_type} scaler...")
             all_embeddings = self.scaler.fit_transform(
                 all_embeddings.squeeze(0).numpy())
-            print("scaler fitted")
+            print(f"{self.scaler_type} scaler fitted")
             all_embeddings = torch.from_numpy(all_embeddings)
 
         # fit quantizer
@@ -729,7 +739,7 @@ class Dataset_RAVEnc(Dataset):
         # scale without the batch dimension
         if self.scale:
             # print("inverse scaling...")
-            if self.scaler_type == "minmax":
+            if self.scaler_type in ["minmax", "standard", "robust"]:
                 data = self.scaler.inverse_transform(data.squeeze(0).numpy())
                 data = torch.from_numpy(data).unsqueeze(0)
             elif self.scaler_type == "global":

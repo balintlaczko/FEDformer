@@ -16,6 +16,7 @@ def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None
     drop_last = flag == 'train'
     scale_flag = args.scale > 0
     quantize_flag = args.quantize > 0
+    filter_vctk_flag = args.filter_vctk > 0
     # if flag == 'test':
     #     quantize_flag = False
     # keep batch size for pred to 1
@@ -36,7 +37,7 @@ def data_provider_ravenc(args, flag, scaler=None, quantizer=None, train_set=None
         scaler=scaler,
         quantizer=quantizer,
         train_set=train_set,
-        filter_vctk=args.filter_vctk,
+        filter_vctk=filter_vctk_flag,
     )
     print(flag, len(data_set))
     data_loader = DataLoader(
