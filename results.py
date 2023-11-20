@@ -805,7 +805,7 @@ print(model_b_evo_fad_score)
 # test number range stats of the train set vs test set
 
 t_train_dataset, _ = data_provider_ravenc(args_b, "train")
-t_test_dataset, _ = data_provider_ravenc(args_b, "test")
+t_test_dataset, _ = data_provider_ravenc(args_b, "val")
 
 # %%
 # get chunk ids from train and test sets
@@ -822,18 +822,23 @@ t_test_chunks = torch.cat(t_test_chunks, dim=-1) # (1, 8, 1195)
 
 # %%
 t_train_chunks.min(), t_train_chunks.max()
+
 # %%
 t_test_chunks.min(), t_test_chunks.max()
+
 # %%
 t_train_chunks.mean(), t_train_chunks.std()
+
 # %%
 t_test_chunks.mean(), t_test_chunks.std()
+
 # %%
 t_train_chunks.median()
+
 # %%
 t_test_chunks.median()
+
 # %%
-# kld between train and test
 # repeat test chunks 9 times
 t_test_chunks_rep = t_test_chunks.repeat(1, 1, 9) # (1, 8, 10755)
 t_train_chunks_trim = t_train_chunks[..., :t_test_chunks_rep.shape[-1]] # (1, 8, 10755)
