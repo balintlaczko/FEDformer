@@ -20,8 +20,8 @@ parser.add_argument('--version', type=str, default='Fourier', help='version of t
 parser.add_argument('--modes', type=int, default=64, help='number of modes to use for the Fourier layer')
 parser.add_argument('--pred_len', type=int, default=256, help='number of steps to predict')
 parser.add_argument('--scale', type=int, default=1, help='scale the data')
-parser.add_argument('--scaler_type', type=str, default='minmax', help='type of scaler to use (minmax or global)')
-parser.add_argument('--scaler_load_path', type=str, default='checkpoints/scaler.pt', help='path to where to load the fit scaler from')
+parser.add_argument('--scaler_type', type=str, default='minmax', help='type of scaler to use (minmax, standard, robust or global)')
+parser.add_argument('--scaler_load_path', type=str, default=None, help='path to where to load the fit scaler from')
 parser.add_argument('--quantize', type=int, default=1, help='quantize the data')
 parser.add_argument('--quantizer_type', type=str, default='msprior', help='type of quantizer to use (kmeans or msprior)')
 parser.add_argument('--quantizer_num_clusters', type=int, default=64, help='number of clusters for quantization')
@@ -146,8 +146,8 @@ class Configs_debug(object):
 
 # %%
 # create data loaders for test set
-# train_dataset, train_loader = data_provider_ravenc(args, "train")
-test_dataset, test_loader = data_provider_ravenc(args, "test", scaler=args.scaler_load_path,)
+train_dataset, train_loader = data_provider_ravenc(args, "train")
+test_dataset, test_loader = data_provider_ravenc(args, "test", scaler=train_dataset.scaler, train_set=train_dataset)
 # %%
 # in "global" scaling mode we need the global min and max from the train set
 if args.scaler_type == 'global':
