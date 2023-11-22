@@ -516,12 +516,12 @@ class Dataset_RAVEnc(Dataset):
         if self.quantize:
             if self.quantizer_type == "kmeans":
                 if self.quantizer == None:
-                    # self.quantizer = KMeans(
-                    #     n_clusters=self.num_clusters, distance="euclidean")
+                    self.quantizer = KMeans(
+                        n_clusters=self.num_clusters, distance="euclidean")
                     pass
                 elif type(quantizer) == str:
-                    # self.quantizer = KMeans(
-                    #     n_clusters=self.num_clusters, distance="euclidean")
+                    self.quantizer = KMeans(
+                        n_clusters=self.num_clusters, distance="euclidean")
                     self.quantizer.load_state_dict(torch.load(quantizer))
                     self.quantizer_is_fit = True
             elif self.quantizer_type == "msprior":
@@ -676,8 +676,8 @@ class Dataset_RAVEnc(Dataset):
             print("using robust scaler")
 
         # get progress bar from chunks dataset
-        pbar = tqdm.tqdm(self.whole_file_embeddings)
-        pbar.set_description(f"fitting {self.scaler_type} scaler")
+        # pbar = tqdm.tqdm(self.whole_file_embeddings)
+        # pbar.set_description(f"fitting {self.scaler_type} scaler")
         # the embeddings are BCT
         all_embeddings = torch.cat(self.whole_file_embeddings, dim=-1)
         # print("all embeddings shape: ", all_embeddings.shape)
