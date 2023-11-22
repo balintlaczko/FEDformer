@@ -311,9 +311,9 @@ class Model_noif(nn.Module):
             self.dec_embedding = PositionalEmbedding(configs.d_model)
         elif self.embed == 'token_pos':
             self.enc_embedding = DataEmbedding_onlypos(
-                configs.enc_in, configs.d_model)
+                configs.enc_in, configs.d_model, dropout=configs.dropout)
             self.dec_embedding = DataEmbedding_onlypos(
-                configs.dec_in, configs.d_model)
+                configs.dec_in, configs.d_model, dropout=configs.dropout)
         elif self.embed == 'stepped_token':
             self.enc_embedding = SteppedTokenEmbedding(
                 configs.enc_in, configs.d_model)
