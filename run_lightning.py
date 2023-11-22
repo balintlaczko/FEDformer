@@ -95,8 +95,8 @@ def main():
     parser.add_argument('--scaler_load_path', type=str, default=None, help='path to where to load the fit scaler from')
     parser.add_argument('--quantize', type=int, default=1, help='whether to quantize data')
     parser.add_argument('--quantizer_type', type=str, default='kmeans', help='type of quantizer to use')
-    parser.add_argument('--quantizer_num_clusters', type=int, default=64, help='number of clusters for quantizer')
-    parser.add_argument('--quantizer_load_path', type=str, default='checkpoints/quantizer.pt', help='path to where to load the fit k-means quantizer from')
+    parser.add_argument('--quantizer_num_clusters', type=int, default=8192, help='number of clusters for quantizer')
+    parser.add_argument('--quantizer_load_path', type=str, default=None, help='path to where to load the fit k-means quantizer from')
 
     parser.add_argument('--filter_vctk', type=int, default=1, help='whether to filter out vctk')
     # parser.add_argument('--factor', type=int, default=1, help='attn factor')
